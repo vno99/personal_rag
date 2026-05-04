@@ -1,0 +1,14 @@
+pandas
+gunicorn
+streamlit
+scikit-learn
+matplotlib
+seaborn
+plotly
+langchain_mistralai
+torchvision
+weaviate-client==4.21.0
+langchain-huggingface==1.2.2
+sentence-transformers==5.4.1
+langdetect==1.0.9
+deep_translator==1.11.4

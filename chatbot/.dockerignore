@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.git/
+.env
+*.log
+logs/
+data/
+.venv/
+*.csv
+*.parquet
