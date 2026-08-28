@@ -1,4 +1,14 @@
 
+# SITEMAP_URL = https://docs.langchain.com/sitemap.xml
+# FILTER_URLS=[r"https://docs\.langchain\.com/.*"]
+
+# DOCS_FILE_PATTERN = "langchain_docs_batch_"
+# CHUNKS_FILE_PATTERN = "langchain_chunks_batch_"
+
+# COLLECTION_NAME = "LangchainDocs"
+
+
+
 # SITEMAP_URL = "https://docs.databricks.com/en/doc-sitemap.xml"
 # FILTER_URLS=[r"https://docs\.databricks\.com/aws/en/.*"]
 
