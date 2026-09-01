@@ -207,9 +207,20 @@ def retrieve_context(query_text, top_k=TOP_K, collections=None):
     client = connect_client()
 
     try:
+        # Ignore les collections configurées mais non encore ingérées en base
+        existing = [name for name in collections if client.collections.exists(name)]
+        if not existing:
+            return {
+                "in_scope": False,
+                "reason": "no_results",
+                "context": "",
+                "sources": [],
+                "debug": [],
+            }
+
         results_by_collection = [
             query_one_collection(client, name, query_text_en, query_vector, top_k)
-            for name in collections
+            for name in existing
         ]
 
         fused = fuse(results_by_collection, top_k=top_k)
