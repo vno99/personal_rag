@@ -1,3 +1,4 @@
+import argparse
 import json
 import uuid
 from pathlib import Path
@@ -12,19 +13,12 @@ from weaviate.classes.data import DataObject
 
 logger = setup_logging(__name__)
 
-CHUNKS_FILE_PATTERN = config.CHUNKS_FILE_PATTERN
-JSONL_EXT = config.JSONL_EXT
-
 CHUNKS_DATA_DIR = Path(config.CHUNKS_DATA_DIR)
-COLLECTION_NAME = config.COLLECTION_NAME
-
 WEAVIATE_HOST = config.WEAVIATE_HOST
 WEAVIATE_PORT = config.WEAVIATE_PORT
 WEAVIATE_GRPC_PORT = config.WEAVIATE_GRPC_PORT
-
 BATCH_SIZE_WEAVIATE = config.BATCH_SIZE_WEAVIATE
 EMBEDDING_MODEL_NAME = config.EMBEDDING_MODEL_NAME
-
 EMBEDDING_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 NORMALIZE_EMBEDDINGS = config.NORMALIZE_EMBEDDINGS
 
@@ -59,15 +53,17 @@ def connect_client():
     )
 
 
-def get_collection(client):
+def get_collection(client, collection_name: str):
     """
     Ensure the Weaviate collection exists, creating it if necessary.
-    
+
     Parameters:
     -----------
     client : WeaviateClient
         The Weaviate client instance to interact with the database
-        
+    collection_name : str
+        The name of the collection to get or create
+
     Returns:
     --------
     Collection
@@ -75,14 +71,14 @@ def get_collection(client):
     """
     existing_coll = client.collections.list_all()
 
-    if COLLECTION_NAME in existing_coll:
-        logger.info(f"Collection '{COLLECTION_NAME}' existe déjà")
-        return client.collections.get(COLLECTION_NAME)
+    if collection_name in existing_coll:
+        logger.info(f"Collection '{collection_name}' existe déjà")
+        return client.collections.get(collection_name)
 
-    logger.info(f"Création de la collection '{COLLECTION_NAME}'...")
+    logger.info(f"Création de la collection '{collection_name}'...")
 
     client.collections.create(
-        name=COLLECTION_NAME,
+        name=collection_name,
         properties=[
             Property(name="chunk_id", data_type=DataType.TEXT),
             Property(name="source", data_type=DataType.TEXT),
@@ -95,9 +91,9 @@ def get_collection(client):
         vector_config=Configure.Vectors.self_provided(),
     )
 
-    logger.info(f"Collection '{COLLECTION_NAME}' créée")
+    logger.info(f"Collection '{collection_name}' créée")
 
-    return client.collections.get(COLLECTION_NAME)
+    return client.collections.get(collection_name)
 
 
 def read_jsonl_file(file_path: Path):
@@ -221,10 +217,22 @@ def ingest_file(weaviate_collection, embeddings, file_path: Path):
 
 
 def main():
-    input_files = sorted(CHUNKS_DATA_DIR.glob(f"{CHUNKS_FILE_PATTERN}*.{JSONL_EXT}"))
+    parser = argparse.ArgumentParser(description="Embedding + indexation Weaviate d'une source")
+    parser.add_argument(
+        "--source",
+        required=True,
+        choices=[source["name"] for source in config.SOURCES],
+        help="Nom de la source à ingérer",
+    )
+    args = parser.parse_args()
+
+    collection_name = config.get_collection(args.source)
+    chunks_pattern = config.chunks_pattern(args.source)
+
+    input_files = sorted(CHUNKS_DATA_DIR.glob(f"{chunks_pattern}*.{config.JSONL_EXT}"))
 
     if not input_files:
-        logger.info(f"Aucun fichier {CHUNKS_FILE_PATTERN}*.{JSONL_EXT} trouvé dans {CHUNKS_DATA_DIR}")
+        logger.info(f"Aucun fichier {chunks_pattern}*.{config.JSONL_EXT} trouvé dans {CHUNKS_DATA_DIR}")
         return
 
     logger.info(f"{len(input_files)} fichiers trouvés dans {CHUNKS_DATA_DIR}")
@@ -233,12 +241,12 @@ def main():
     client = connect_client()
 
     try:
-        weaviate_collection = get_collection(client)
+        weaviate_collection = get_collection(client, collection_name)
 
         for file_path in input_files:
             ingest_file(weaviate_collection, embeddings, file_path)
 
-        logger.info("Ingestion Weaviate terminée.")
+        logger.info(f"Ingestion Weaviate terminée pour '{args.source}'.")
 
     finally:
         client.close()
