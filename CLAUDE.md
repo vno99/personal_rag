@@ -33,7 +33,7 @@ Direction validée en brainstorming (sept. 2026). La **Phase A — Multi-sources
 
 ### Phase A — Chatbot UX multi-collections (non implémentée)
 
-- **Chatbot — UX multi-collections** : `COLLECTIONS` passe à 6 entrées (Snowflake, Databricks, Next.js, TypeScript, Python). Sélection **manuelle multi-collections** (checkbox/multiselect, « toutes » par défaut) en remplacement des `pills` mono-sélection. Le retrieval fait **N requêtes hybrides** (une par collection sélectionnée), puis **fusion min-max par collection** (scores normalisés en [0,1] par collection, concaténation, tri). Le seuil `MIN_VECTOR_SCORE` s'applique sur le **top global normalisé** : le repli ne se déclenche que si le meilleur score global est sous le seuil.
+- **Chatbot — UX multi-collections** : `COLLECTIONS` passe à 5 entrées (Snowflake, Databricks, Next.js, TypeScript, Python). Sélection **manuelle multi-collections** (checkbox/multiselect, « toutes » par défaut) en remplacement des `pills` mono-sélection. Le retrieval fait **N requêtes hybrides** (une par collection sélectionnée), puis **fusion min-max par collection** (scores normalisés en [0,1] par collection, concaténation, tri). Le seuil `MIN_VECTOR_SCORE` s'applique sur le **top global normalisé** : le repli ne se déclenche que si le meilleur score global est sous le seuil.
 
 ### Phase B — Administration (app Streamlit séparée)
 
