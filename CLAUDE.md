@@ -15,21 +15,24 @@ Le repo est découpé en **deux mondes indépendants** :
 
 Le répertoire `data/` contient les fichiers intermédiaires (`raw/` = docs bruts, `chunks/` = chunks) au format JSONL — **ignorés par git** (`/data/**/*.jsonl`).
 
-## Évolution planifiée (non implémentée)
+## Évolution planifiée
 
-Direction validée en brainstorming (sept. 2026), **pas encore implémentée**. Deux chantiers liés, à traiter en deux phases :
+Direction validée en brainstorming (sept. 2026). La **Phase A — Multi-sources (pipeline)** est **implémentée** (voir `app/config/config.py`, `app/extractors/`, `app/get_docs.py`, `app/chunk_docs.py`, `app/ingest_weaviate.py`). Restent **non implémentées** : la **Phase A — chatbot** (UX multi-collections) et la **Phase B** (administration).
 
-### Phase A — Multi-sources
+### Phase A — Multi-sources (pipeline) — IMPLÉMENTÉE
 
-- **Refonte de `app/config/config.py`** : passer d'« une source active + blocs commentés » à une **liste `SOURCES`** data-driven. Chaque source porte : `name`, `type` (extraction), URL, pattern de fichiers dérivé du nom, `collection`, `content_selector`.
-- **Trois mécaniques d'extraction** derrière une **classe abstraite `BaseExtractor`** (`app/extractors/`) avec héritage — `SitemapExtractor`, `GitExtractor`, `ArchiveExtractor` implémentent une interface commune `extraire()` → JSONL. `get_docs.py` devient un dispatcher qui instancie la classe selon `source['type']`. Ajouter une source d'un nouveau type = ajouter un extracteur.
+- **`app/config/config.py`** : liste **`SOURCES`** data-driven. Chaque source porte : `name`, `type` (extraction), URL, pattern de fichiers dérivé du nom, `collection`, `content_selector`.
+- **Trois mécaniques d'extraction** derrière une **classe abstraite `BaseExtractor`** (`app/extractors/`) avec héritage — `SitemapExtractor`, `GitExtractor`, `ArchiveExtractor` implémentent une interface commune `extract()` → JSONL. `get_docs.py` est un dispatcher qui instancie la classe selon `source['type']`. Ajouter une source d'un nouveau type = ajouter un extracteur.
   | Source | Type | Classe | Mécanique |
   |---|---|---|---|
-  | Snowflake, Databricks, Next.js | `sitemap` | `SitemapExtractor` | `SitemapLoader` (existant) |
+  | Snowflake, Databricks, Next.js | `sitemap` | `SitemapExtractor` | `SitemapLoader` |
   | TypeScript | `git` | `GitExtractor` | cloner `microsoft/TypeScript-Website` (branch `v2`), lire les `.md` de `packages/documentation/copy/en/` |
   | Python | `archive` | `ArchiveExtractor` | télécharger `https://docs.python.org/3.14/archives/python-3.14-docs-html.zip` (~17 Mo), extraire, parser les HTML |
-- **Généraliser l'extraction HTML** : la doc Python (Sphinx) utilise `<div class="body" role="main">`, pas `<article>`. La fonction `keep_article_element` doit gérer les deux sélecteurs — le sélecteur de contenu devient un paramètre de la source (`content_selector`).
+- **Extraction HTML généralisée** : le sélecteur de contenu est un paramètre de la source (`content_selector`) — `article` pour la plupart, `[role='main']` pour la doc Python (Sphinx).
 - **Java : écarté pour l'instant** (API Javadoc trop volumineuse, pas de sitemap exploitable).
+
+### Phase A — Chatbot UX multi-collections (non implémentée)
+
 - **Chatbot — UX multi-collections** : `COLLECTIONS` passe à 6 entrées (Snowflake, Databricks, Next.js, TypeScript, Python). Sélection **manuelle multi-collections** (checkbox/multiselect, « toutes » par défaut) en remplacement des `pills` mono-sélection. Le retrieval fait **N requêtes hybrides** (une par collection sélectionnée), puis **fusion min-max par collection** (scores normalisés en [0,1] par collection, concaténation, tri). Le seuil `MIN_VECTOR_SCORE` s'applique sur le **top global normalisé** : le repli ne se déclenche que si le meilleur score global est sous le seuil.
 
 ### Phase B — Administration (app Streamlit séparée)
@@ -50,9 +53,9 @@ Direction validée en brainstorming (sept. 2026), **pas encore implémentée**. 
 
 Tous les scripts font `import config.config as config` : **`app/config/config.py` est la source unique de vérité** pour la source de docs, les noms de fichiers, la collection Weaviate, la taille des chunks, le modèle d'embedding, etc. Les scripts doivent être lancés **depuis la racine du repo** (`python app/<script>.py`) : les imports `config.*` résolvent `app/`, mais les chemins de données (`./data/...`) sont relatifs.
 
-1. **`get_docs.py`** — extrait les docs depuis un sitemap (par défaut `https://docs.snowflake.com/sitemap.xml`), ne garde que la balise `<article>` de chaque page, et sauvegarde par lots de `BATCH_SIZE_DOCS` dans `data/raw/{pattern}{batch:03d}.jsonl`. Reprend automatiquement au dernier batch existant (création de fichiers reprise).
-2. **`chunk_docs.py`** — découpe chaque doc en chunks via `RecursiveCharacterTextSplitter` (tokenizer mpnet, `CHUNK_SIZE=500`, overlap `75`). Génère un `chunk_id` = hash SHA-1 de `source::index::content`. Écrit dans `data/chunks/` en miroir des fichiers raw (le pattern de nom `docs_` → `chunks_`).
-3. **`ingest_weaviate.py`** — calcule les embeddings par lots de `BATCH_SIZE_WEAVIATE`, crée la collection si besoin et insère via `insert_many`. UUID déterministe : `uuid3(NAMESPACE_DNS, chunk_id)` → **ré-ingérer est idempotent** (pas de doublons).
+1. **`get_docs.py`** — dispatcher `--source <name>` : instancie l'extracteur correspondant au `type` de la source (`sitemap` → `SitemapExtractor`, `git` → `GitExtractor`, `archive` → `ArchiveExtractor`, cf. `app/extractors/`) et sauvegarde les docs par lots de `BATCH_SIZE_DOCS` dans `data/raw/{name}_docs_batch_{batch:03d}.jsonl`.
+2. **`chunk_docs.py`** — découpe chaque doc en chunks via `RecursiveCharacterTextSplitter` (tokenizer mpnet, `CHUNK_SIZE=500`, overlap `75`). Génère un `chunk_id` = hash SHA-1 de `source::index::content`. Lit `data/raw/{name}_docs_batch_*.jsonl` et écrit dans `data/chunks/{name}_chunks_batch_*.jsonl` en miroir.
+3. **`ingest_weaviate.py`** — calcule les embeddings par lots de `BATCH_SIZE_WEAVIATE`, crée la collection si besoin (nom dérivé de la source via `config.get_collection(name)`) et insère via `insert_many`. UUID déterministe : `uuid3(NAMESPACE_DNS, chunk_id)` → **ré-ingérer est idempotent** (pas de doublons).
 4. **`query_weaviate.py`** — script de test *jetable* (hors du pipeline) : exécute une recherche hybride sur une question codée en dur (`QUERY_TEXT`) et affiche les résultats. (Fichier récent, non suivi par git.)
 
 Le logging est configuré par `app/config/logging.yml` (console + fichier rotatif `logs/app.log`), chargé via `app/config/logger_config.py`.
@@ -82,10 +85,11 @@ Les deux modèles (embedding + tokenizer mpnet) sont **téléchargés depuis Hug
 # Lancer Weaviate local
 docker-compose up -d
 
-# Pipeline d'ingestion (dans l'ordre, depuis la racine)
-python app/get_docs.py          # 1. extraction sitemap → data/raw/
-python app/chunk_docs.py        # 2. chunking → data/chunks/
-python app/ingest_weaviate.py   # 3. embedding + indexation Weaviate
+# Pipeline d'ingestion (dans l'ordre, depuis la racine ; une source par run)
+python app/get_docs.py --source typescript        # 1. extraction → data/raw/
+python app/chunk_docs.py --source typescript      # 2. chunking → data/chunks/
+python app/ingest_weaviate.py --source typescript # 3. embedding + indexation Weaviate
+# --source ∈ {snowflake, databricks, nextjs, typescript, python} (défini dans config.SOURCES)
 
 # Test manuel de la recherche hybride
 python app/query_weaviate.py
@@ -104,7 +108,7 @@ Pas de tests automatisés ni de linter configuré dans le repo. `requirements.tx
 ## Pièges fréquents
 
 - **Lancer les scripts d'ingestion depuis la racine** : les chemins `./data/...` sont relatifs au répertoire courant.
-- **Changer de source de documentation** = éditer `app/config/config.py` : le fichier contient des blocs commentés (LangChain, Databricks) en plus de l'actif (Snowflake). Chaque source a son propre pattern de fichiers ET sa propre collection — penser aussi à la refléter dans `chatbot/app.py` (`COLLECTIONS`).
+- **Changer de source de documentation** = éditer la liste **`SOURCES`** de `app/config/config.py` (data-driven, plus de blocs commentés) : chaque source porte son `type`, ses URLs, sa `collection` et son `content_selector`, avec son propre pattern de fichiers (`{name}_docs_batch_*`). Après une modification, relancer `get_docs.py --source <name>` → `chunk_docs.py --source <name>` → `ingest_weaviate.py --source <name>`. Les collections du pipeline doivent rester synchronisées avec `chatbot/app.py` (`COLLECTIONS`).
 - **GPU CUDA requis pour l'ingestion** : `config.py` force `EMBEDDING_DEVICE = "cuda:0"`, mais `ingest_weaviate.py` bascule sur CPU si CUDA n'est pas disponible (le chatbot fait pareil). L'ingestion de gros volumes sur CPU est très lente.
 - **Ré-ingestion sûre** grâce aux UUID déterministes — utile pour relancer après un changement de config, mais les anciennes entrées restent jusqu'à purge de la collection.
 - L'environnement de dev cible Conda + Python 3.12+ (`.vscode/settings.json`).
