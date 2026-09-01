@@ -49,7 +49,7 @@ class GitExtractor(BaseExtractor):
         parsed = urlparse(self.repo_url)
         if parsed.scheme in ("http", "https"):
             host = parsed.netloc
-            path = parsed.path.rstrip("/")
+            path = parsed.path.rstrip("/").removesuffix(".git")
             return f"https://{host}{path}/blob/{self.branch}/{rel_path.as_posix()}"
         # dépôt local (tests) : URL inutilisable, on retombe sur un chemin
         return f"file://{self.cache_dir}/{rel_path.as_posix()}"
