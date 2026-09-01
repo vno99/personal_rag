@@ -2,6 +2,7 @@ import subprocess
 from pathlib import Path
 from urllib.parse import urlparse
 
+import config.config as config
 from extractors.base import BaseExtractor
 
 
@@ -19,7 +20,7 @@ class GitExtractor(BaseExtractor):
         self.repo_url = source["repo_url"]
         self.branch = source.get("branch")
         self.docs_path = source["docs_path"]
-        self.cache_dir = cache_dir or (raw_dir.parent / "raw_src" / self.name)
+        self.cache_dir = cache_dir or (raw_dir.parent / config.RAW_SRC_DIR / self.name)
 
     def _clone_or_fetch(self) -> Path:
         self.cache_dir.mkdir(parents=True, exist_ok=True)

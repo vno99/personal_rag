@@ -7,7 +7,7 @@ from extractors.git import GitExtractor
 def make_local_repo(root: Path) -> Path:
     repo = root / "repo"
     repo.mkdir()
-    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "init", "-q", "-b", "master", str(repo)], check=True)
     subprocess.run(
         ["git", "-C", str(repo), "config", "user.email", "test@test.com"], check=True
     )
