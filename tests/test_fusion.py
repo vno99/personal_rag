@@ -29,13 +29,12 @@ def test_fuse_orders_by_norm_score_desc():
     col_b = [_res(10, 0.7), _res(20, 0.8)]     # normés en interne -> 0.0, 1.0
     fused = fuse([col_a, col_b], top_k=3)
     assert len(fused) == 3
-    # les deux "meilleurs" de chaque collection arrivent en tête
+    # les deux "meilleurs" de chaque collection arrivent en tête (norm_score 1.0)
     assert fused[0]["norm_score"] == 1.0
     assert fused[1]["norm_score"] == 1.0
-    # score de la collection A (le meilleur de A = 0.6) bat celui de B (0.8)
-    # dans l'égalité 1.0/1.0, l'ordre relatif des deux meilleurs est arbitraire :
-    # on vérifie seulement que les deux premiers sont des 1.0
-    assert fused[0]["hybrid_score"] in (200, 20)
+    # tie-break : col_b (vector 0.8) passe devant col_a (vector 0.6)
+    assert fused[0]["hybrid_score"] == 20
+    assert fused[1]["hybrid_score"] == 200
 
 
 def test_fuse_respects_top_k():

@@ -36,7 +36,9 @@ def normalize_minmax(results, score_key="hybrid_score"):
 
 
 def fuse(results_by_collection, top_k=3):
-    """Normalise chaque collection, concatène, trie par `norm_score` décroissant.
+    """Normalise chaque collection, concatène, trie par `norm_score` décroissant
+    (tie-break : `vector_score` décroissant pour que le résultat le plus
+    pertinent de toutes les collections arrive en tête).
 
     Args:
         results_by_collection (list[list[dict]]): Une liste par collection,
@@ -51,7 +53,10 @@ def fuse(results_by_collection, top_k=3):
         for collection in results_by_collection
         for item in normalize_minmax(collection)
     ]
-    normalized.sort(key=lambda r: r["norm_score"], reverse=True)
+    normalized.sort(
+        key=lambda r: (r["norm_score"], r.get("vector_score") or 0.0),
+        reverse=True,
+    )
     return normalized[:top_k]
 
 
