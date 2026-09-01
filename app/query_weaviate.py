@@ -1,3 +1,5 @@
+import argparse
+
 import config.config as config
 import weaviate
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -8,6 +10,14 @@ LIMIT = 3
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Test jetable de la recherche hybride")
+    parser.add_argument(
+        "--collection",
+        default=config.get_collection(config.SOURCES[0]["name"]),
+        help="Collection Weaviate à interroger",
+    )
+    args = parser.parse_args()
+
     embeddings = HuggingFaceEmbeddings(
         model_name=config.EMBEDDING_MODEL_NAME,
         model_kwargs={"device": config.EMBEDDING_DEVICE},
@@ -23,13 +33,13 @@ def main():
     )
 
     try:
-        collection = client.collections.get(config.COLLECTION_NAME)
+        collection = client.collections.get(args.collection)
 
         response = collection.query.hybrid(
             query=QUERY_TEXT,
             vector=query_vector,
-            alpha=0.5,  # 50/50 sémantique + mots-clés
-            limit=3,
+            alpha=0.5,
+            limit=LIMIT,
         )
 
         print(f"\n🔎 Query: {QUERY_TEXT}\n")
