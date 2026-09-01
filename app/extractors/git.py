@@ -20,7 +20,7 @@ class GitExtractor(BaseExtractor):
         self.repo_url = source["repo_url"]
         self.branch = source.get("branch")
         self.docs_path = source["docs_path"]
-        self.cache_dir = cache_dir or (raw_dir.parent / config.RAW_SRC_DIR / self.name)
+        self.cache_dir = cache_dir or (Path(config.RAW_SRC_DIR) / self.name)
 
     def _clone_or_fetch(self) -> Path:
         self.cache_dir.mkdir(parents=True, exist_ok=True)

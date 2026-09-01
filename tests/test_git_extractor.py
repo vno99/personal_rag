@@ -34,7 +34,7 @@ def test_git_extractor_reads_markdown(tmp_path):
         "collection": "TypeScriptDocs",
         "content_selector": None,
     }
-    extractor = GitExtractor(source, tmp_path / "raw", batch_size=500)
+    extractor = GitExtractor(source, tmp_path / "raw", batch_size=500, cache_dir=tmp_path / "src")
     written = extractor.extract()
 
     assert len(written) == 1
