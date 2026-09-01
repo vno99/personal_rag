@@ -42,7 +42,7 @@ def main():
             limit=LIMIT,
         )
 
-        print(f"\n🔎 Query: {QUERY_TEXT}\n")
+        print(f"\nQuery: {QUERY_TEXT}\n")
 
         if not response.objects:
             print("Aucun résultat.")
