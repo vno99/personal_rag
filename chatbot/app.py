@@ -37,6 +37,18 @@ COLLECTIONS = [
         "name": "DatabricksDocs",
         "description": "Databricks documentation : https://docs.databricks.com/en"
     },
+    {
+        "name": "NextJSDocs",
+        "description": "Next.js documentation : https://nextjs.org/docs"
+    },
+    {
+        "name": "TypeScriptDocs",
+        "description": "TypeScript documentation : https://www.typescriptlang.org/docs"
+    },
+    {
+        "name": "PythonDocs",
+        "description": "Python documentation : https://docs.python.org/3"
+    },
 ]
 COL_NAME_LIST = [col["name"] for col in COLLECTIONS]
 
@@ -239,12 +251,11 @@ def main():
         with st.container(border=True):
             st.header("Configuration")
 
-            selected_collection = st.pills(
-                "Sélectionnez la collection", 
-                COL_NAME_LIST, 
-                default=COLLECTION_NAME,
-                required=True,
-                selection_mode="single"
+            selected_collections = st.multiselect(
+                "Collections à interroger",
+                COL_NAME_LIST,
+                default=COL_NAME_LIST,
+                help="Sélectionnez une ou plusieurs collections. Par défaut : toutes.",
             )
 
             top_num = st.slider(
@@ -295,7 +306,7 @@ def main():
                     result = retrieve_context(
                         prompt,
                         top_k=top_num,
-                        collection_name=selected_collection
+                        collections=selected_collections,
                     )
 
                     if not result["in_scope"]:
