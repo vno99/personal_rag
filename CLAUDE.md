@@ -15,6 +15,35 @@ Le repo est découpé en **deux mondes indépendants** :
 
 Le répertoire `data/` contient les fichiers intermédiaires (`raw/` = docs bruts, `chunks/` = chunks) au format JSONL — **ignorés par git** (`/data/**/*.jsonl`).
 
+## Évolution planifiée (non implémentée)
+
+Direction validée en brainstorming (sept. 2026), **pas encore implémentée**. Deux chantiers liés, à traiter en deux phases :
+
+### Phase A — Multi-sources
+
+- **Refonte de `app/config/config.py`** : passer d'« une source active + blocs commentés » à une **liste `SOURCES`** data-driven. Chaque source porte : `name`, `type` (extraction), URL, pattern de fichiers dérivé du nom, `collection`, `content_selector`.
+- **Trois mécaniques d'extraction** derrière une **classe abstraite `BaseExtractor`** (`app/extractors/`) avec héritage — `SitemapExtractor`, `GitExtractor`, `ArchiveExtractor` implémentent une interface commune `extraire()` → JSONL. `get_docs.py` devient un dispatcher qui instancie la classe selon `source['type']`. Ajouter une source d'un nouveau type = ajouter un extracteur.
+  | Source | Type | Classe | Mécanique |
+  |---|---|---|---|
+  | Snowflake, Databricks, Next.js | `sitemap` | `SitemapExtractor` | `SitemapLoader` (existant) |
+  | TypeScript | `git` | `GitExtractor` | cloner `microsoft/TypeScript-Website` (branch `v2`), lire les `.md` de `packages/documentation/copy/en/` |
+  | Python | `archive` | `ArchiveExtractor` | télécharger `https://docs.python.org/3.14/archives/python-3.14-docs-html.zip` (~17 Mo), extraire, parser les HTML |
+- **Généraliser l'extraction HTML** : la doc Python (Sphinx) utilise `<div class="body" role="main">`, pas `<article>`. La fonction `keep_article_element` doit gérer les deux sélecteurs — le sélecteur de contenu devient un paramètre de la source (`content_selector`).
+- **Java : écarté pour l'instant** (API Javadoc trop volumineuse, pas de sitemap exploitable).
+- **Chatbot — UX multi-collections** : `COLLECTIONS` passe à 6 entrées (Snowflake, Databricks, Next.js, TypeScript, Python). Sélection **manuelle multi-collections** (checkbox/multiselect, « toutes » par défaut) en remplacement des `pills` mono-sélection. Le retrieval fait **N requêtes hybrides** (une par collection sélectionnée), puis **fusion min-max par collection** (scores normalisés en [0,1] par collection, concaténation, tri). Le seuil `MIN_VECTOR_SCORE` s'applique sur le **top global normalisé** : le repli ne se déclenche que si le meilleur score global est sous le seuil.
+
+### Phase B — Administration (app Streamlit séparée)
+
+- **Nouvelle app Streamlit dédiée** (pas une page de `chatbot/app.py`) qui pilote le pipeline.
+- **Lancement en sous-processus** : l'app appelle les scripts d'ingestion via `subprocess`, avec statut/log lu depuis un fichier — l'UI reste réactive pendant l'ingestion.
+- **Fichier de statut par run** : un fichier JSON par run dans `data/status/` (nommé par timestamp, ex: `2026-09-01T14-30-05_typescript.json`), plus un pointeur `latest.json` vers le run le plus récent. **Un run = une source** (`operation`: ingest | purge | chunk). Les scripts écrivent via un utilitaire partagé (`status_writer`). Contenu : `run_id`, `source`, `operation`, `status` (running/done/failed/cancelled), `pid` (pour kill), timestamps, `step` (get_docs/chunk_docs/ingest_weaviate/cleanup), `step_progress` (`{done, total}`), `last_message`, `error`. Historique limité aux derniers N runs (ex: 10).
+- **Planification : manuelle uniquement** pour l'instant (pas de scheduler).
+- **Stratégie de fraîcheur hybride** (le cœur du « cycle de vie ») :
+  - **Weaviate comme source de vérité** : il stocke déjà `lastmod` et `source` par objet → pas de manifeste séparé.
+  - **Diff du signal de changement par type de source** : `lastmod` (sitemap), hash de commit/date du fichier (git), version/hash du zip (archive).
+  - **Chemin principal** : ne re-télécharger/re-embedder que les pages modifiées ; supprimer les pages disparues (par `source`, objets dont le `chunk_id` n'est plus dans le nouveau set de chunks).
+  - **Fallback** : re-téléchargement complet si le signal de changement est absent/peu fiable — le diff des chunks contre Weaviate reste valide (pas de ré-embedding massif).
+
 ## Architecture
 
 ### Pipeline d'ingestion (`app/`) — un script = une étape, exécutés séquentiellement
