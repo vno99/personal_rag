@@ -10,6 +10,8 @@ from langdetect import detect
 from weaviate.classes.query import HybridFusion, MetadataQuery
 from deep_translator import GoogleTranslator
 
+from fusion import fuse, is_in_scope
+
 WEAVIATE_HOST = "host.docker.internal"
 WEAVIATE_PORT = 9090
 WEAVIATE_GRPC_PORT = 50051
@@ -150,84 +152,96 @@ def translate_to_english(text):
     return GoogleTranslator(source='auto', target='en').translate(text)
 
 
-def retrieve_context(query_text, top_k=TOP_K, collection_name=COLLECTION_NAME):
+def query_one_collection(client, collection_name, query_text_en, query_vector, top_k):
+    """Exécute une recherche hybride sur une collection et parse les résultats."""
+    collection = client.collections.get(collection_name)
+
+    response = collection.query.hybrid(
+        query=query_text_en,
+        vector=query_vector,
+        alpha=ALPHA,
+        limit=top_k,
+        return_metadata=MetadataQuery(score=True, explain_score=True),
+        fusion_type=HybridFusion.RELATIVE_SCORE,
+    )
+
+    results = []
+    for obj in response.objects:
+        props = obj.properties or {}
+        explain_score = obj.metadata.explain_score or ""
+        vector_score, keyword_score = extract_scores(explain_score)
+
+        results.append({
+            "collection": collection_name,
+            "content": props.get("content", ""),
+            "source": props.get("source", "N/A"),
+            "hybrid_score": float(obj.metadata.score) if obj.metadata.score is not None else 0.0,
+            "vector_score": vector_score,
+            "keyword_score": keyword_score,
+            "explain_score": explain_score,
+        })
+
+    return results
+
+
+def retrieve_context(query_text, top_k=TOP_K, collections=None):
     """
-    Performs hybrid retrieval with automatic translation to English.
+    Recherche hybride multi-collections avec fusion min-max par collection.
 
     Args:
-        query_text (str): The input query.
-        top_k (int, optional): Number of documents to retrieve.
+        query_text (str): La requête (auto-traduite en anglais si besoin).
+        top_k (int, optional): Nombre de résultats à garder après fusion.
             Defaults to TOP_K.
-        collection_name (str, optional): Target collection name.
-            Defaults to COLLECTION_NAME.
+        collections (list[str], optional): Noms des collections à interroger.
+            Defaults to [COLLECTION_NAME].
 
     Returns:
-        dict: A dictionary containing 'in_scope' (bool), 'reason' (str), 
-              'context' (str), 'sources' (list), and 'debug' (list).
+        dict: 'in_scope' (bool), 'reason' (str), 'context' (str),
+              'sources' (list), 'debug' (list, résultats fusionnés).
     """
-    # Prepare the query: Translate if necessary in english and generate embedding
+    if collections is None:
+        collections = [COLLECTION_NAME]
+
     query_text_en = translate_to_english(query_text) if not is_english(query_text) else query_text
-    
     query_vector = embeddings.embed_query(query_text_en)
     client = connect_client()
 
     try:
-        collection = client.collections.get(collection_name)
-        
-        # Execute the query
-        response = collection.query.hybrid(
-            query=query_text_en,
-            vector=query_vector,
-            alpha=ALPHA,
-            limit=top_k,
-            return_metadata=MetadataQuery(score=True, explain_score=True),
-            fusion_type=HybridFusion.RELATIVE_SCORE,
-        )
-        
-        # Parse results into a structured format
-        results = []
-        for obj in response.objects:
-            props = obj.properties or {}
-            explain_score = obj.metadata.explain_score or ""
-            vector_score, keyword_score = extract_scores(explain_score)
+        results_by_collection = [
+            query_one_collection(client, name, query_text_en, query_vector, top_k)
+            for name in collections
+        ]
 
-            results.append({
-                "content": props.get("content", ""),
-                "source": props.get("source", "N/A"),
-                "hybrid_score": float(obj.metadata.score) if obj.metadata.score is not None else 0.0,
-                "vector_score": vector_score,
-                "keyword_score": keyword_score,
-                "explain_score": explain_score,
-            })
+        fused = fuse(results_by_collection, top_k=top_k)
 
-        # Determine in_scope and reason based on results
-        context = ""
-        sources = []
-        if not results:
-            in_scope = False
-            reason = "no_results"
-            top1_vector_score = None
-        else:
-            in_scope = False
-            top1 = results[0]
-            top1_vector_score = top1["vector_score"]
-            
-            if top1_vector_score is None:
-                reason = "missing_vector_score"
-            elif top1_vector_score < MIN_VECTOR_SCORE:
-                reason = f"vector_score_too_low ({top1_vector_score:.4f} < {MIN_VECTOR_SCORE})"
-            else:
-                in_scope = True
-                reason = "ok"
-                context = "\n\n".join([r["content"] for r in results if r["content"]])
-                sources = [r["source"] for r in results]
+        if not fused:
+            return {
+                "in_scope": False,
+                "reason": "no_results",
+                "context": "",
+                "sources": [],
+                "debug": [],
+            }
+
+        if not is_in_scope(fused, min_vector_score=MIN_VECTOR_SCORE):
+            top1 = fused[0]["vector_score"]
+            return {
+                "in_scope": False,
+                "reason": f"vector_score_too_low ({top1} < {MIN_VECTOR_SCORE})",
+                "context": "",
+                "sources": [],
+                "debug": fused,
+            }
+
+        context = "\n\n".join([r["content"] for r in fused if r.get("content")])
+        sources = [r["source"] for r in fused]
 
         return {
-            "in_scope": in_scope,
-            "reason": reason,
+            "in_scope": True,
+            "reason": "ok",
             "context": context,
             "sources": sources,
-            "debug": results if results else [],
+            "debug": fused,
         }
 
     finally:
