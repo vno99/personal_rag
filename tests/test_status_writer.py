@@ -1,3 +1,5 @@
+import pytest
+
 from status_writer import (
     create_run_file, latest_run, list_runs, mark_cancelled, mark_done,
     mark_failed, prune_history, read_run, run_id_from_now, status_path,
@@ -43,6 +45,22 @@ def test_transitions(tmp_path):
     mark_cancelled(path)
     rec = read_run(path)
     assert rec["status"] == "cancelled" and rec["error"] is None
+
+
+def test_update_run_file_missing_raises(tmp_path):
+    path = status_path(tmp_path, "r1", "python")
+    with pytest.raises(FileNotFoundError):
+        update_run_file(path, step="chunk_docs")
+
+
+def test_mark_done_refreshes_latest(tmp_path):
+    path = status_path(tmp_path, "2026-09-02T16-20-05", "python")
+    create_run_file(path, run_id="2026-09-02T16-20-05", source="python", operation="ingest",
+                    start_step="chunk_docs", steps=["chunk_docs", "ingest_weaviate"],
+                    status_dir=tmp_path)
+    assert latest_run(tmp_path)["status"] == "running"
+    mark_done(path)
+    assert latest_run(tmp_path)["status"] == "done"
 
 
 def test_update_progress_and_step(tmp_path):

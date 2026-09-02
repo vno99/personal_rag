@@ -72,7 +72,9 @@ def create_run_file(path, *, run_id, source, operation, start_step, steps,
 
 def update_run_file(path, **fields) -> dict:
     path = Path(path)
-    record = read_run(path) or {}
+    record = read_run(path)
+    if record is None:
+        raise FileNotFoundError(f"fichier de statut introuvable: {path}")
     for key, value in fields.items():
         record[key] = value
     record["updated_at"] = _now_iso()
@@ -80,17 +82,28 @@ def update_run_file(path, **fields) -> dict:
     return record
 
 
+def _refresh_latest(path: Path) -> None:
+    """Rafraîchit latest.json du répertoire du run après une transition de statut."""
+    _set_latest(path.parent, path)
+
+
 def mark_done(path, last_message="terminé") -> dict:
-    return update_run_file(path, status="done", finished_at=_now_iso(), last_message=last_message)
+    rec = update_run_file(path, status="done", finished_at=_now_iso(), last_message=last_message)
+    _refresh_latest(path)
+    return rec
 
 
 def mark_failed(path, error) -> dict:
-    return update_run_file(path, status="failed", finished_at=_now_iso(), error=str(error))
+    rec = update_run_file(path, status="failed", finished_at=_now_iso(), error=str(error))
+    _refresh_latest(path)
+    return rec
 
 
 def mark_cancelled(path) -> dict:
-    return update_run_file(path, status="cancelled", finished_at=_now_iso(),
-                           error=None, last_message="annulé")
+    rec = update_run_file(path, status="cancelled", finished_at=_now_iso(),
+                          error=None, last_message="annulé")
+    _refresh_latest(path)
+    return rec
 
 
 def _set_latest(status_dir, path: Path) -> None:
