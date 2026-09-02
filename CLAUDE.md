@@ -17,7 +17,12 @@ Le répertoire `data/` contient les fichiers intermédiaires (`raw/` = docs brut
 
 ## Évolution planifiée
 
-Direction validée en brainstorming (sept. 2026). La **Phase A — Multi-sources (pipeline)** est **implémentée** (voir `app/config/config.py`, `app/extractors/`, `app/get_docs.py`, `app/chunk_docs.py`, `app/ingest_weaviate.py`). Restent **non implémentées** : la **Phase A — chatbot** (UX multi-collections) et la **Phase B** (administration).
+Direction validée en brainstorming (sept. 2026). La **Phase A** est **implémentée** dans ses deux volets :
+
+- **Multi-sources (pipeline)** — voir `app/config/config.py`, `app/extractors/`, `app/get_docs.py`, `app/chunk_docs.py`, `app/ingest_weaviate.py`.
+- **Chatbot UX multi-collections** — voir `chatbot/app.py`, `chatbot/fusion.py`, `tests/test_fusion.py`.
+
+Reste **non implémentée** : la **Phase B** (administration).
 
 ### Phase A — Multi-sources (pipeline) — IMPLÉMENTÉE
 
@@ -31,9 +36,11 @@ Direction validée en brainstorming (sept. 2026). La **Phase A — Multi-sources
 - **Extraction HTML généralisée** : le sélecteur de contenu est un paramètre de la source (`content_selector`) — `article` pour la plupart, `[role='main']` pour la doc Python (Sphinx).
 - **Java : écarté pour l'instant** (API Javadoc trop volumineuse, pas de sitemap exploitable).
 
-### Phase A — Chatbot UX multi-collections (non implémentée)
+### Phase A — Chatbot UX multi-collections (implémentée)
 
-- **Chatbot — UX multi-collections** : `COLLECTIONS` passe à 5 entrées (Snowflake, Databricks, Next.js, TypeScript, Python). Sélection **manuelle multi-collections** (checkbox/multiselect, « toutes » par défaut) en remplacement des `pills` mono-sélection. Le retrieval fait **N requêtes hybrides** (une par collection sélectionnée), puis **fusion min-max par collection** (scores normalisés en [0,1] par collection, concaténation, tri). Le seuil `MIN_VECTOR_SCORE` s'applique sur le **top global normalisé** : le repli ne se déclenche que si le meilleur score global est sous le seuil.
+- **`chatbot/app.py`** : `COLLECTIONS` compte 5 entrées (Snowflake, Databricks, Next.js, TypeScript, Python). Sélection **manuelle multi-collections** dans la sidebar (`st.multiselect`, « toutes » par défaut). Le retrieval fait **N requêtes hybrides** (une par collection sélectionnée ; les collections configurées mais non encore ingérées en base sont ignorées), puis délègue la fusion à `chatbot/fusion.py`.
+- **`chatbot/fusion.py`** : logique de fusion **pure** (sans dépendance Streamlit/Weaviate, testable unitairement). **Fusion min-max par collection** (`normalize_minmax`, scores normalisés en [0,1]), concaténation et tri par `norm_score` décroissant avec **tie-break `vector_score`** (`fuse`). Le seuil `MIN_VECTOR_SCORE` s'applique sur le **top fusionné** : `is_in_scope` ne valide que si le `vector_score` brut du top-1 global est ≥ seuil, sinon l'app renvoie un message de repli.
+- **Tests** : `tests/test_fusion.py` couvre `normalize_minmax`, `fuse` et `is_in_scope` (voir la section Commandes).
 
 ### Phase B — Administration (app Streamlit séparée)
 
@@ -60,16 +67,16 @@ Tous les scripts font `import config.config as config` : **`app/config/config.py
 
 Le logging est configuré par `app/config/logging.yml` (console + fichier rotatif `logs/app.log`), chargé via `app/config/logger_config.py`.
 
-### Chatbot (`chatbot/app.py`) — tout dans un seul fichier
+### Chatbot — Streamlit (`chatbot/app.py`) + fusion (`chatbot/fusion.py`)
 
-App Streamlit qui à chaque question :
+L'interface Streamlit vit dans `app.py` ; la logique de fusion multi-collections est extraite dans `fusion.py` (module **pur**, sans dépendance Streamlit/Weaviate, importé par `app.py`). À chaque question, l'app :
 1. **Traduit en anglais si nécessaire** (`langdetect` + `deep_translator` GoogleTranslator), puis embedde la requête.
-2. **Recherche hybride** Weaviate (`alpha=0.7`, `fusion_type=RELATIVE_SCORE`, `top_k` réglable). La pertinence est validée par un seuil `MIN_VECTOR_SCORE=0.45` sur le score vectoriel brut (parsé depuis `explain_score`) : si le top-1 est sous le seuil, l'app renvoie un message de repli au lieu d'inventer une réponse.
+2. **Recherche hybride multi-collections** : une requête Weaviate par collection sélectionnée dans la sidebar (`alpha=0.7`, `fusion_type=RELATIVE_SCORE`, `top_k` réglable), puis **fusion min-max** via `fusion.py` (normalisation en [0,1] par collection, tri, tie-break `vector_score`). La pertinence est validée par un seuil `MIN_VECTOR_SCORE=0.45` sur le `vector_score` brut du top-1 fusionné (parsé depuis `explain_score`) : sous le seuil, l'app renvoie un message de repli au lieu d'inventer une réponse.
 3. **Génère** avec `ChatMistralAI` un prompt RAG strict : la réponse doit rester dans le contexte fourni, code SQL/Python copié tel quel. La langue de réponse est sélectionnable (FR/EN/DE/NL) via `LANGUAGES`.
 
 Points d'attention :
 - `WEAVIATE_HOST = "host.docker.internal"` et les ports sont **codés en dur** (pas via `config.py`).
-- La liste `COLLECTIONS` (Snowflake + Databricks) et le `COLLECTION_NAME` par défaut doivent **rester synchronisés** avec les collections réellement ingérées par le pipeline.
+- La liste `COLLECTIONS` (5 entrées : Snowflake, Databricks, Next.js, TypeScript, Python) et le `COLLECTION_NAME` par défaut (utilisé comme repli de `retrieve_context`) doivent **rester synchronisés** avec les collections réellement ingérées par le pipeline.
 - La clé `MISTRAL_API_KEY` vient de la variable d'environnement (voir `chatbot/.env_example`).
 - Les `@st.cache_resource` / `@st.cache_data` cachent respectivement le modèle d'embedding (mémoire) et les traductions (1h).
 
@@ -101,9 +108,12 @@ streamlit run app.py
 docker build . -t personal_chatbot --no-cache
 docker run -e PORT=7862 -e MISTRAL_API_KEY="<clé>" -p 7862:7862 personal_chatbot
 # → http://localhost:7862/
+
+# Tests (fusion + extracteurs ; pytest.ini → tests/)
+python -m pytest
 ```
 
-Pas de tests automatisés ni de linter configuré dans le repo. `requirements.txt` (racine, ingestion) et `chatbot/requirements.txt` (UI) sont indépendants — l'image Docker installe d'abord torch CPU (`torch==2.6.0+cpu`) puis le reste.
+**pytest** est configuré (`pytest.ini`, `tests/` — fusion multi-collections et extracteurs), dépendance listée dans `requirements-dev.txt` (racine). Pas de linter configuré. `requirements.txt` (racine, ingestion), `requirements-dev.txt` et `chatbot/requirements.txt` (UI) sont indépendants — l'image Docker installe d'abord torch CPU (`torch==2.6.0+cpu`) puis le reste.
 
 ## Pièges fréquents
 
