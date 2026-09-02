@@ -6,12 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Application de **RAG (Retrieval-Augmented Generation)** personnelle : elle indexe de la documentation technique dans **Weaviate** et la rend interrogable via un chatbot **Streamlit**. La recherche est **hybride** (dense + BM25/sparse), fusionnée par Weaviate avec un `alpha=0.7`. Embeddings `sentence-transformers/all-mpnet-base-v2` générés côté client (HuggingFace), LLM de génération `ChatMistralAI` (modèle par défaut `mistral-medium-latest`, surchargeable via la variable d'env `MISTRAL_MODEL`).
 
-Le repo est découpé en **deux mondes indépendants** :
+Le repo est découpé en **trois mondes indépendants** :
 
 | Composant | Dossier | Rôle |
 |---|---|---|
 | Pipeline d'ingestion | `app/` | Extraction → chunking → embedding → indexation Weaviate |
 | Interface chatbot | `chatbot/` | App Streamlit, retrieval + génération |
+| Administration pipeline | `admin/` | App Streamlit (Phase B) qui pilote le pipeline : lancement de runs, suivi temps réel, kill, purge, historique |
 
 Le répertoire `data/` contient les fichiers intermédiaires (`raw/` = docs bruts, `chunks/` = chunks) au format JSONL — **ignorés par git** (`/data/**/*.jsonl`).
 
@@ -118,11 +119,11 @@ docker build -f admin/Dockerfile . -t personal_admin
 docker run -e PORT=7863 -p 7863:7863 personal_admin
 # → http://localhost:7863/
 
-# Tests (fusion + extracteurs ; pytest.ini → tests/)
+# Tests (fusion, extracteurs, chunking, status_writer, runner, config, helpers d'ingestion ; pytest.ini → tests/)
 python -m pytest
 ```
 
-**pytest** est configuré (`pytest.ini`, `tests/` — fusion multi-collections et extracteurs), dépendance listée dans `requirements-dev.txt` (racine). Pas de linter configuré. `requirements.txt` (racine, ingestion), `requirements-dev.txt` et `chatbot/requirements.txt` (UI) sont indépendants — l'image Docker installe d'abord torch CPU (`torch==2.6.0+cpu`) puis le reste.
+**pytest** est configuré (`pytest.ini`, `tests/` — fusion multi-collections, extracteurs, chunking, status_writer, runner, config et helpers d'ingestion), dépendance listée dans `requirements-dev.txt` (racine). Pas de linter configuré. `requirements.txt` (racine, ingestion), `requirements-dev.txt` et `chatbot/requirements.txt` (UI) sont indépendants — l'image Docker installe d'abord torch CPU (`torch==2.6.0+cpu`) puis le reste.
 
 ## Pièges fréquents
 
