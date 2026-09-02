@@ -36,8 +36,7 @@ SOURCE_CHOICES = [s["name"] for s in config.SOURCES]
 
 def weaviate_ready() -> bool:
     try:
-        connect_client().close()
-        return True
+        return bool(connect_client().is_ready())
     except Exception:
         return False
 
