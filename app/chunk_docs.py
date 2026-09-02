@@ -74,6 +74,49 @@ def chunk_one_record(record, splitter=SPLITTER, tokenizer=TOKENIZER):
     return output
 
 
+def run(source_name: str, status=None) -> None:
+    docs_pattern = config.docs_pattern(source_name)
+    chunks_pattern = config.chunks_pattern(source_name)
+
+    input_files = sorted(RAW_DIR.glob(f"{docs_pattern}*.{config.JSONL_EXT}"))
+    logger.info(f"input_files : {input_files}")
+
+    total_files = len(input_files)
+    total_chunks = 0
+    done_files = 0
+
+    for input_file in input_files:
+        output_file = CHUNKS_DIR / input_file.name.replace(docs_pattern, chunks_pattern)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+
+        file_chunks = 0
+        with input_file.open("r", encoding="utf-8") as fin:
+            with output_file.open("w", encoding="utf-8") as fout:
+                for line_num, line in enumerate(fin, start=1):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        record = json.loads(line)
+                    except json.JSONDecodeError as e:
+                        logger.error(f"JSON invalide dans {input_file.name}, ligne {line_num}: {e}")
+                        continue
+
+                    chunks = chunk_one_record(record)
+                    for chunk in chunks:
+                        fout.write(json.dumps(chunk, ensure_ascii=False) + "\n")
+                    file_chunks += len(chunks)
+
+        done_files += 1
+        total_chunks += file_chunks
+        logger.info(f"Terminé {input_file.name} : {file_chunks} chunks")
+        if status is not None:
+            status.progress(done_files, total_files)
+            status.message(f"Terminé {input_file.name}: {file_chunks} chunks ({total_chunks} au total)")
+
+    logger.info(f"Terminé. {total_chunks} chunks au total")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Découpe les docs brutes en chunks")
     parser.add_argument(
@@ -83,47 +126,7 @@ def main():
         help="Nom de la source à chunker",
     )
     args = parser.parse_args()
-
-    docs_pattern = config.docs_pattern(args.source)
-    chunks_pattern = config.chunks_pattern(args.source)
-
-    total_docs = 0
-    total_chunks = 0
-
-    input_files = sorted(RAW_DIR.glob(f"{docs_pattern}*.{config.JSONL_EXT}"))
-    logger.info(f"input_files : {input_files}")
-
-    for input_file in input_files:
-        output_file = CHUNKS_DIR / input_file.name.replace(docs_pattern, chunks_pattern)
-        output_file.parent.mkdir(parents=True, exist_ok=True)
-
-        with input_file.open("r", encoding="utf-8") as fin:
-            with output_file.open("w", encoding="utf-8") as fout:
-                for line_num, line in enumerate(fin, start=1):
-                    line = line.strip()
-                    if not line:
-                        continue
-
-                    try:
-                        record = json.loads(line)
-                    except json.JSONDecodeError as e:
-                        logger.error(f"JSON invalide dans {input_file.name}, ligne {line_num}: {e}")
-                        continue
-
-                    total_docs += 1
-                    chunks = chunk_one_record(record)
-
-                    for chunk in chunks:
-                        fout.write(json.dumps(chunk, ensure_ascii=False) + "\n")
-
-                    total_chunks += len(chunks)
-
-                    if total_docs % 100 == 0:
-                        logger.info(f"{input_file.name} : {total_docs} docs traités - {total_chunks} chunks créés")
-
-        logger.info(f"Terminé {input_file.name} : {total_docs} docs - {total_chunks} chunks")
-
-    logger.info("Terminé.")
+    run(args.source)
 
 
 if __name__ == "__main__":
