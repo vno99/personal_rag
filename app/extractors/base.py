@@ -1,8 +1,11 @@
 import json
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Callable
 
 from config.config import docs_pattern
+
+ProgressCallback = Callable[[int, int | None], None]
 
 
 class BaseExtractor(ABC):
@@ -32,8 +35,12 @@ class BaseExtractor(ABC):
         return out_file
 
     @abstractmethod
-    def extract(self) -> list[Path]:
+    def extract(self, progress: ProgressCallback | None = None) -> list[Path]:
         """Extrait les documents et écrit les fichiers JSONL bruts.
+
+        Args:
+            progress: callback optionnel appelé avec (done, total) au fil de
+                l'extraction ; `total` vaut None quand il est inconnu d'avance.
 
         Returns:
             list[Path]: Les chemins des fichiers batch écrits.

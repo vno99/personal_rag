@@ -9,6 +9,9 @@ RAW_DATA_DIR = "./data/raw"
 CHUNKS_DATA_DIR = "./data/chunks"
 RAW_SRC_DIR = "./data/raw_src"
 
+STATUS_DIR = "./data/status"
+RUNS_HISTORY = 10
+
 CHUNK_TOKENIZER = "sentence-transformers/all-mpnet-base-v2"
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 75

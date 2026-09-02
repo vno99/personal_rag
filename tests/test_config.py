@@ -35,3 +35,8 @@ def test_get_source_unknown_raises():
 
 def test_get_collection():
     assert config.get_collection("python") == "PythonDocs"
+
+
+def test_status_constants():
+    assert config.STATUS_DIR == "./data/status"
+    assert config.RUNS_HISTORY == 10

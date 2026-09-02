@@ -54,16 +54,19 @@ class GitExtractor(BaseExtractor):
         # dépôt local (tests) : URL inutilisable, on retombe sur un chemin
         return f"file://{self.cache_dir}/{rel_path.as_posix()}"
 
-    def extract(self) -> list[Path]:
+    def extract(self, progress=None) -> list[Path]:
         repo = self._clone_or_fetch()
         docs_root = repo / self.docs_path
         md_files = sorted(docs_root.rglob("*.md"))
+        total = len(md_files)
 
         written: list[Path] = []
         batch: list[dict] = []
         batch_num = 0
 
-        for md_file in md_files:
+        for done, md_file in enumerate(md_files, start=1):
+            if progress is not None:
+                progress(done, total)
             rel_path = md_file.relative_to(repo)
             content = md_file.read_text(encoding="utf-8")
             record = {
@@ -80,5 +83,4 @@ class GitExtractor(BaseExtractor):
 
         if batch:
             written.append(self._save_batch(batch, batch_num))
-
         return written

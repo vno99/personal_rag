@@ -140,7 +140,7 @@ def batch_iterable(records, batch_size: int):
         yield batch
 
 
-def ingest_file(weaviate_collection, embeddings, file_path: Path):
+def ingest_file(weaviate_collection, embeddings, file_path: Path, progress=None):
     """
     Reads a JSONL file, processes its records, and inserts them into a Weaviate collection.
 
@@ -148,6 +148,8 @@ def ingest_file(weaviate_collection, embeddings, file_path: Path):
         weaviate_collection (DataCollection): The Weaviate collection to insert data into.
         embeddings (Embeddings): The embedding model to generate vectors from text content.
         file_path (Path): The path to the JSONL file containing records to ingest.
+        progress (callable, optional): A callback invoked once per batch with the
+            number of records in that batch.
     """
     logger.info(f"Ingestion de {file_path.name}...")
 
@@ -157,6 +159,9 @@ def ingest_file(weaviate_collection, embeddings, file_path: Path):
     records = read_jsonl_file(file_path)
 
     for batch_num, records_batch in enumerate(batch_iterable(records, BATCH_SIZE_WEAVIATE), start=1):
+        if progress is not None:
+            progress(len(records_batch))
+
         texts = [record.get("content", "") for record in records_batch]
 
         try:
@@ -216,6 +221,46 @@ def ingest_file(weaviate_collection, embeddings, file_path: Path):
     logger.info(f"Fin {file_path.name} : {total} chunks insérés, {failed} en échec")
 
 
+def run(source_name: str, status=None) -> None:
+    collection_name = config.get_collection(source_name)
+    chunks_pattern = config.chunks_pattern(source_name)
+
+    input_files = sorted(CHUNKS_DATA_DIR.glob(f"{chunks_pattern}*.{config.JSONL_EXT}"))
+
+    if not input_files:
+        logger.info(f"Aucun fichier {chunks_pattern}*.{config.JSONL_EXT} trouvé dans {CHUNKS_DATA_DIR}")
+        if status is not None:
+            raise RuntimeError(
+                f"aucun fichier {chunks_pattern}*.{config.JSONL_EXT} pour la source '{source_name}'")
+        return
+
+    logger.info(f"{len(input_files)} fichiers trouvés dans {CHUNKS_DATA_DIR}")
+    total = sum(1 for f in input_files for _ in read_jsonl_file(f))
+    logger.info(f"{total} chunks à ingérer")
+
+    if status is not None:
+        status.progress(0, total)
+        status.message(f"{total} chunks à ingérer")
+
+    embeddings = get_embeddings()
+    client = connect_client()
+    processed = 0
+
+    def on_progress(n: int) -> None:
+        nonlocal processed
+        processed += n
+        if status is not None:
+            status.progress(processed, total)
+
+    try:
+        weaviate_collection = get_collection(client, collection_name)
+        for file_path in input_files:
+            ingest_file(weaviate_collection, embeddings, file_path, progress=on_progress)
+        logger.info(f"Ingestion Weaviate terminée pour '{source_name}'.")
+    finally:
+        client.close()
+
+
 def main():
     parser = argparse.ArgumentParser(description="Embedding + indexation Weaviate d'une source")
     parser.add_argument(
@@ -225,31 +270,7 @@ def main():
         help="Nom de la source à ingérer",
     )
     args = parser.parse_args()
-
-    collection_name = config.get_collection(args.source)
-    chunks_pattern = config.chunks_pattern(args.source)
-
-    input_files = sorted(CHUNKS_DATA_DIR.glob(f"{chunks_pattern}*.{config.JSONL_EXT}"))
-
-    if not input_files:
-        logger.info(f"Aucun fichier {chunks_pattern}*.{config.JSONL_EXT} trouvé dans {CHUNKS_DATA_DIR}")
-        return
-
-    logger.info(f"{len(input_files)} fichiers trouvés dans {CHUNKS_DATA_DIR}")
-
-    embeddings = get_embeddings()
-    client = connect_client()
-
-    try:
-        weaviate_collection = get_collection(client, collection_name)
-
-        for file_path in input_files:
-            ingest_file(weaviate_collection, embeddings, file_path)
-
-        logger.info(f"Ingestion Weaviate terminée pour '{args.source}'.")
-
-    finally:
-        client.close()
+    run(args.source)
 
 
 if __name__ == "__main__":

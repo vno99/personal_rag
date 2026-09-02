@@ -51,7 +51,7 @@ class ArchiveExtractor(BaseExtractor):
             return self.archive_url.split("/archives/", 1)[0]
         return self.archive_url
 
-    def extract(self) -> list[Path]:
+    def extract(self, progress=None) -> list[Path]:
         archive = self._download()
         root = self._extract_zip(archive)
         base_url = self._base_url()
@@ -59,14 +59,17 @@ class ArchiveExtractor(BaseExtractor):
         written: list[Path] = []
         batch: list[dict] = []
         batch_num = 0
+        html_files = sorted(root.rglob("*.html"))
+        total = len(html_files)
 
-        for html_file in sorted(root.rglob("*.html")):
+        for done, html_file in enumerate(html_files, start=1):
+            if progress is not None:
+                progress(done, total)
             rel = html_file.relative_to(root).as_posix()
             soup = BeautifulSoup(html_file.read_text(encoding="utf-8"), "lxml")
             content = extract_from_soup(soup, self.selector)
             if not content.strip():
                 continue
-
             record = {
                 "source": f"{base_url}/{rel}",
                 "loc": rel,
@@ -81,5 +84,4 @@ class ArchiveExtractor(BaseExtractor):
 
         if batch:
             written.append(self._save_batch(batch, batch_num))
-
         return written

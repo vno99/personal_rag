@@ -85,3 +85,27 @@ def test_sitemap_extractor_resumes_at_next_batch(tmp_path):
 
     assert len(written) == 1
     assert written[0].name == "nextjs_docs_batch_001.jsonl"
+
+
+def test_sitemap_extractor_reports_progress(tmp_path):
+    batches = [
+        [FakeDoc("A", "https://x.com/a", "a", None), FakeDoc("B", "https://x.com/b", "b", None)],
+        [],
+    ]
+    n = {"i": 0}
+
+    def loader_factory(**kwargs):
+        docs = batches[n["i"]]
+        n["i"] += 1
+        return FakeLoader(docs)
+
+    source = {
+        "name": "nextjs", "type": "sitemap",
+        "sitemap_url": "https://nextjs.org/sitemap.xml",
+        "filter_urls": [r"https://nextjs\.org/docs/.*"],
+        "collection": "NextJSDocs", "content_selector": "article",
+    }
+    calls = []
+    extractor = SitemapExtractor(source, tmp_path, batch_size=500, loader_factory=loader_factory)
+    extractor.extract(progress=lambda done, total: calls.append((done, total)))
+    assert calls == [(2, None)]
