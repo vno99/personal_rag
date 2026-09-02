@@ -211,3 +211,4 @@ __marimo__/
 
 /data/**/*.jsonl
 /data/raw_src/
+/data/status/
