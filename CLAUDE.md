@@ -22,7 +22,7 @@ Direction validée en brainstorming (sept. 2026). La **Phase A** est **implémen
 - **Multi-sources (pipeline)** — voir `app/config/config.py`, `app/extractors/`, `app/get_docs.py`, `app/chunk_docs.py`, `app/ingest_weaviate.py`.
 - **Chatbot UX multi-collections** — voir `chatbot/app.py`, `chatbot/fusion.py`, `tests/test_fusion.py`.
 
-Reste **non implémentée** : la **Phase B** (administration).
+La **Phase B — Administration** est **implémentée en v1 (pilotage + statut)** : `admin/`, `app/status_writer.py`, `app/runner.py`. **Différé** : la stratégie de fraîcheur incrémentale (pages modifiées/disparues), le scheduler et la purge ciblée.
 
 ### Phase A — Multi-sources (pipeline) — IMPLÉMENTÉE
 
@@ -42,17 +42,14 @@ Reste **non implémentée** : la **Phase B** (administration).
 - **`chatbot/fusion.py`** : logique de fusion **pure** (sans dépendance Streamlit/Weaviate, testable unitairement). **Fusion min-max par collection** (`normalize_minmax`, scores normalisés en [0,1]), concaténation et tri par `norm_score` décroissant avec **tie-break `vector_score`** (`fuse`). Le seuil `MIN_VECTOR_SCORE` s'applique sur le **top fusionné** : `is_in_scope` ne valide que si le `vector_score` brut du top-1 global est ≥ seuil, sinon l'app renvoie un message de repli.
 - **Tests** : `tests/test_fusion.py` couvre `normalize_minmax`, `fuse` et `is_in_scope` (voir la section Commandes).
 
-### Phase B — Administration (app Streamlit séparée)
+### Phase B — Administration (implémentée, v1 pilotage + statut)
 
-- **Nouvelle app Streamlit dédiée** (pas une page de `chatbot/app.py`) qui pilote le pipeline.
-- **Lancement en sous-processus** : l'app appelle les scripts d'ingestion via `subprocess`, avec statut/log lu depuis un fichier — l'UI reste réactive pendant l'ingestion.
-- **Fichier de statut par run** : un fichier JSON par run dans `data/status/` (nommé par timestamp, ex: `2026-09-01T14-30-05_typescript.json`), plus un pointeur `latest.json` vers le run le plus récent. **Un run = une source** (`operation`: ingest | purge | chunk). Les scripts écrivent via un utilitaire partagé (`status_writer`). Contenu : `run_id`, `source`, `operation`, `status` (running/done/failed/cancelled), `pid` (pour kill), timestamps, `step` (get_docs/chunk_docs/ingest_weaviate/cleanup), `step_progress` (`{done, total}`), `last_message`, `error`. Historique limité aux derniers N runs (ex: 10).
-- **Planification : manuelle uniquement** pour l'instant (pas de scheduler).
-- **Stratégie de fraîcheur hybride** (le cœur du « cycle de vie ») :
-  - **Weaviate comme source de vérité** : il stocke déjà `lastmod` et `source` par objet → pas de manifeste séparé.
-  - **Diff du signal de changement par type de source** : `lastmod` (sitemap), hash de commit/date du fichier (git), version/hash du zip (archive).
-  - **Chemin principal** : ne re-télécharger/re-embedder que les pages modifiées ; supprimer les pages disparues (par `source`, objets dont le `chunk_id` n'est plus dans le nouveau set de chunks).
-  - **Fallback** : re-téléchargement complet si le signal de changement est absent/peu fiable — le diff des chunks contre Weaviate reste valide (pas de ré-embedding massif).
+- **App dédiée** `admin/app.py` (pas une page de `chatbot/app.py`) qui pilote le pipeline : lance un run en **sous-processus**, suit sa progression **temps réel**, permet de l'**arrêter**, **purge** une collection Weaviate et garde un **historique**.
+- **Un run = une source**, exécuté dans **un seul process** par `app/runner.py` (`get_docs → chunk_docs → ingest_weaviate`), avec **points de départ avancés** (dès le chunking / dès l'ingestion : pas de re-téléchargement).
+- **`app/status_writer.py`** (utilitaire partagé) écrit un fichier JSON par run dans `data/status/{run_id}_{source}.json` (+ pointeur `latest.json`), **atomiquement**. Contenu : `run_id`, `source`, `operation` (ingest | purge), `start_step`, `steps`, `status` (running/done/failed/cancelled), `pid`, timestamps, `step`, `step_progress` {done,total}, `last_message`, `error`. Historique borné à `RUNS_HISTORY` (10).
+- **Instrumentation optionnelle** : les scripts exposent `run(source, status=None)` ; sans `status`, comportement CLI inchangé. Les extracteurs exposent une progression optionnelle.
+- **Planification : manuelle uniquement.**
+- **Différé (non implémenté)** : stratégie de fraîcheur hybride (diff `lastmod`/git/archive des pages modifiées + suppression des pages disparues), scheduler, purge ciblée.
 
 ## Architecture
 
@@ -79,6 +76,10 @@ Points d'attention :
 - La liste `COLLECTIONS` (5 entrées : Snowflake, Databricks, Next.js, TypeScript, Python) et le `COLLECTION_NAME` par défaut (utilisé comme repli de `retrieve_context`) doivent **rester synchronisés** avec les collections réellement ingérées par le pipeline.
 - La clé `MISTRAL_API_KEY` vient de la variable d'environnement (voir `chatbot/.env_example`).
 - Les `@st.cache_resource` / `@st.cache_data` cachent respectivement le modèle d'embedding (mémoire) et les traductions (1h).
+
+### Administration (`admin/app.py`, `app/runner.py`, `app/status_writer.py`)
+
+App Streamlit séparée qui pilote le pipeline (cf. section Phase B ci-dessus).
 
 ## Infrastructure
 
@@ -108,6 +109,14 @@ streamlit run app.py
 docker build . -t personal_chatbot --no-cache
 docker run -e PORT=7862 -e MISTRAL_API_KEY="<clé>" -p 7862:7862 personal_chatbot
 # → http://localhost:7862/
+
+# Admin pipeline — en développement (lancer depuis la racine ; Weaviate local requis)
+streamlit run admin/app.py
+
+# Admin pipeline — conteneurisé
+docker build -f admin/Dockerfile . -t personal_admin
+docker run -e PORT=7863 -p 7863:7863 personal_admin
+# → http://localhost:7863/
 
 # Tests (fusion + extracteurs ; pytest.ini → tests/)
 python -m pytest
