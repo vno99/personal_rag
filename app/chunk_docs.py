@@ -81,6 +81,13 @@ def run(source_name: str, status=None) -> None:
     input_files = sorted(RAW_DIR.glob(f"{docs_pattern}*.{config.JSONL_EXT}"))
     logger.info(f"input_files : {input_files}")
 
+    if not input_files:
+        logger.info(f"Aucun fichier {docs_pattern}*.{config.JSONL_EXT} trouvé dans {RAW_DIR}")
+        if status is not None:
+            raise RuntimeError(
+                f"aucun fichier {docs_pattern}*.{config.JSONL_EXT} pour la source '{source_name}'")
+        return
+
     total_files = len(input_files)
     total_chunks = 0
     done_files = 0

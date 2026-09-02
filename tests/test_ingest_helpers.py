@@ -1,7 +1,22 @@
 import json
 from types import SimpleNamespace
 
+import ingest_weaviate
+import pytest
 from ingest_weaviate import batch_iterable, ingest_file, read_jsonl_file
+
+
+class _FakeStatus:
+    """Objet minimal compatible avec l'instrumentation (progress/message no-op)."""
+
+    def __init__(self):
+        self.calls = []
+
+    def progress(self, done, total):
+        self.calls.append(("progress", done, total))
+
+    def message(self, text):
+        self.calls.append(("message", text))
 
 
 def test_batch_iterable_yields_full_batches():
@@ -51,3 +66,15 @@ def test_ingest_file_reports_progress_per_batch(tmp_path):
     ingest_file(coll, _FakeEmb(), tmp_path / "chunks.jsonl", progress=lambda n: calls.append(n))
     assert calls == [100, 100, 50]
     assert coll.data.inserted == [100, 100, 50]
+
+
+def test_run_raises_with_status_when_no_chunks(monkeypatch, tmp_path):
+    monkeypatch.setattr(ingest_weaviate, "CHUNKS_DATA_DIR", tmp_path)
+    with pytest.raises(RuntimeError, match="aucun fichier"):
+        # Le garde doit lever avant tout appel réseau (get_embeddings/connect_client).
+        ingest_weaviate.run("python", status=_FakeStatus())
+
+
+def test_run_returns_without_status_when_no_chunks(monkeypatch, tmp_path):
+    monkeypatch.setattr(ingest_weaviate, "CHUNKS_DATA_DIR", tmp_path)
+    ingest_weaviate.run("python")  # comportement CLI : ne doit pas lever

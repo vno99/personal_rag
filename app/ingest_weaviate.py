@@ -229,6 +229,9 @@ def run(source_name: str, status=None) -> None:
 
     if not input_files:
         logger.info(f"Aucun fichier {chunks_pattern}*.{config.JSONL_EXT} trouvé dans {CHUNKS_DATA_DIR}")
+        if status is not None:
+            raise RuntimeError(
+                f"aucun fichier {chunks_pattern}*.{config.JSONL_EXT} pour la source '{source_name}'")
         return
 
     logger.info(f"{len(input_files)} fichiers trouvés dans {CHUNKS_DATA_DIR}")

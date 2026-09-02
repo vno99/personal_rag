@@ -1,4 +1,19 @@
+import chunk_docs
+import pytest
 from chunk_docs import chunk_one_record, make_chunk_id
+
+
+class _FakeStatus:
+    """Objet minimal compatible avec l'instrumentation (progress/message no-op)."""
+
+    def __init__(self):
+        self.calls = []
+
+    def progress(self, done, total):
+        self.calls.append(("progress", done, total))
+
+    def message(self, text):
+        self.calls.append(("message", text))
 
 
 class FakeSplitter:
@@ -35,3 +50,14 @@ def test_chunk_one_record_with_injected_splitter():
 def test_chunk_one_record_skips_empty_content():
     record = {"source": "s", "content": "   "}
     assert chunk_one_record(record, splitter=FakeSplitter(), tokenizer=FakeTokenizer()) == []
+
+
+def test_run_raises_with_status_when_no_raw(monkeypatch, tmp_path):
+    monkeypatch.setattr(chunk_docs, "RAW_DIR", tmp_path)
+    with pytest.raises(RuntimeError, match="aucun fichier"):
+        chunk_docs.run("zz_inexistant", status=_FakeStatus())
+
+
+def test_run_returns_without_status_when_no_raw(monkeypatch, tmp_path):
+    monkeypatch.setattr(chunk_docs, "RAW_DIR", tmp_path)
+    chunk_docs.run("zz_inexistant")  # comportement CLI : ne doit pas lever
