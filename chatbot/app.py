@@ -28,7 +28,7 @@ TOP_K = 3
 ALPHA = 0.7
 TEMPERATURE = 0.1
 MAX_TOKEN = 1500
-LLM_MODEL = "mistral-large-latest"
+LLM_MODEL = os.getenv("MISTRAL_MODEL", "mistral-medium-latest")
 
 COLLECTIONS = [
     {

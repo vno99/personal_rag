@@ -24,7 +24,7 @@ Le coeur du système repose sur une recherche combinant :
 ### 🛠️ Stack Technique
 *   **Frontend :** [Streamlit](https://streamlit.io/) (Interface utilisateur interactive).
 *   **Vector Database :** [Weaviate](httpsh://weaviate.io/) (Stockage et recherche hybride ultra-rapide).
-*   **LLM :** Utilisation du model `mistral-large-latest`.
+*   **LLM :** Génération Mistral (`ChatMistralAI`) — modèle par défaut `mistral-medium-latest`, surchargeable via `MISTRAL_MODEL`.
 *   **Modèle d'Embeddings :** `sentence-transformers/all-mpnet-base-v2`.
 
 ## 🛠️  Architecture Technique
