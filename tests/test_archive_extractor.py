@@ -50,3 +50,21 @@ def test_archive_extractor_parses_html(tmp_path, monkeypatch):
     record = json.loads(lines[0])
     assert record["source"] == "https://docs.python.org/3.14/library/os.html"
     assert "Module OS." in record["content"]
+
+
+def test_archive_extractor_reports_progress(tmp_path, monkeypatch):
+    archive = make_local_zip(tmp_path)
+
+    def fake_urlretrieve(url: str, dest):
+        shutil.copyfile(archive, dest)
+
+    monkeypatch.setattr("urllib.request.urlretrieve", fake_urlretrieve)
+    source = {
+        "name": "python", "type": "archive",
+        "archive_url": f"https://docs.python.org/3.14/archives/{archive.name}",
+        "collection": "PythonDocs", "content_selector": "[role='main']",
+    }
+    calls = []
+    extractor = ArchiveExtractor(source, tmp_path / "raw", batch_size=500, cache_dir=tmp_path / "src")
+    extractor.extract(progress=lambda done, total: calls.append((done, total)))
+    assert calls == [(1, 2), (2, 2)]

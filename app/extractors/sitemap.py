@@ -57,9 +57,10 @@ class SitemapExtractor(BaseExtractor):
         }
         return loader
 
-    def extract(self) -> list[Path]:
+    def extract(self, progress=None) -> list[Path]:
         written: list[Path] = []
         blocknum = self._find_next_batch_num()
+        done = 0
 
         while True:
             loader = self._make_loader(blocknum)
@@ -83,6 +84,9 @@ class SitemapExtractor(BaseExtractor):
                 for doc in docs
             ]
             written.append(self._save_batch(records, blocknum))
+            done += len(records)
+            if progress is not None:
+                progress(done, None)
             blocknum += 1
 
         return written
