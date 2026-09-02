@@ -34,6 +34,29 @@ TERMINAL = {"done", "failed", "cancelled"}
 SOURCE_CHOICES = [s["name"] for s in config.SOURCES]
 
 
+def unique_run_id(source: str) -> str:
+    """run_id unique pour la source : suffixe -2, -3, … en cas de collision (même seconde)."""
+    base = run_id_from_now()
+    run_id = base
+    n = 2
+    while status_path(STATUS_DIR, run_id, source).exists():
+        run_id = f"{base}-{n}"
+        n += 1
+    return run_id
+
+
+def active_running_state() -> bool:
+    """Un run non terminal est-il en cours (fichier présent ou process vivant) ?"""
+    entry = st.session_state.get("active")
+    if not entry:
+        return False
+    rec = read_run(Path(entry["path"]))
+    if rec is not None:
+        return rec.get("status") not in TERMINAL
+    proc = st.session_state.get("proc")
+    return proc is not None and proc.poll() is None
+
+
 def weaviate_ready() -> bool:
     try:
         return bool(connect_client().is_ready())
@@ -72,28 +95,31 @@ def collection_counts() -> dict[str, int | None]:
 
 
 def launch_ingest(source: str, label: str) -> None:
-    run_id = run_id_from_now()
+    start_step = START_STEPS[label]
+    run_id = unique_run_id(source)
     path = status_path(STATUS_DIR, run_id, source)
     cmd = [
         sys.executable, "app/runner.py",
         "--source", source, "--run-id", run_id,
-        "--operation", "ingest", "--start-step", START_STEPS[label],
+        "--operation", "ingest", "--start-step", start_step,
     ]
+    proc = None
     try:
-        subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        proc = subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception as exc:  # ex. python introuvable : on trace un run failed
         STATUS_DIR.mkdir(parents=True, exist_ok=True)
         create_run_file(path, run_id=run_id, source=source, operation="ingest",
-                        start_step=START_STEPS[label],
-                        steps=[START_STEPS[label]], status_dir=STATUS_DIR)
+                        start_step=start_step,
+                        steps=[start_step], status_dir=STATUS_DIR)
         mark_failed(path, f"impossible de lancer le runner: {exc}")
     st.session_state["active"] = {"run_id": run_id, "source": source,
                                   "label": label, "path": str(path)}
+    st.session_state["proc"] = proc
 
 
 def purge_collection(source: str) -> None:
     collection = config.get_collection(source)
-    run_id = run_id_from_now()
+    run_id = unique_run_id(source)
     path = status_path(STATUS_DIR, run_id, source)
     STATUS_DIR.mkdir(parents=True, exist_ok=True)
     create_run_file(path, run_id=run_id, source=source, operation="purge",
@@ -107,18 +133,23 @@ def purge_collection(source: str) -> None:
     except Exception as exc:
         mark_failed(path, str(exc))
     st.session_state.pop("active", None)
+    st.session_state.pop("proc", None)
+    st.session_state["confirm_purge"] = False
 
 
 def kill_active(entry: dict) -> None:
-    rec = read_run(Path(entry["path"]))
-    pid = (rec or {}).get("pid")
-    if pid:
+    proc = st.session_state.get("proc")
+    if proc is not None:
         try:
-            os.kill(pid, 9)  # Windows : TerminateProcess ; Unix : SIGKILL
-        except (ProcessLookupError, OSError):
+            proc.kill()
+        except OSError:
             pass
-    mark_cancelled(entry["path"])
+    path = Path(entry["path"])
+    rec = read_run(path)
+    if rec is not None and rec.get("status") not in TERMINAL:
+        mark_cancelled(path)
     st.session_state.pop("active", None)
+    st.session_state.pop("proc", None)
 
 
 def render_run(rec: dict) -> None:
@@ -138,10 +169,15 @@ def render_history() -> None:
         st.info("Aucun run pour l'instant.")
         return
     for r in runs:
+        if not isinstance(r, dict) or not r.get("run_id"):
+            continue
         status = r.get("status", "?")
         emoji = {"done": "✅", "failed": "❌", "running": "🔄",
                  "cancelled": "⏹️"}.get(status, "❔")
-        with st.expander(f"{emoji} {r['run_id']} — {r['source']} ({r['operation']})"):
+        run_id = r.get("run_id", "?")
+        source = r.get("source", "?")
+        operation = r.get("operation", "?")
+        with st.expander(f"{emoji} {run_id} — {source} ({operation})"):
             st.json(r)
 
 
@@ -174,8 +210,16 @@ def main() -> None:
         source = st.selectbox("Source", SOURCE_CHOICES, key="run_source")
         label = st.radio("Opération", list(START_STEPS) + ["Purge collection"], key="op")
 
+        if label != "Purge collection":
+            st.session_state["confirm_purge"] = False
+
+        running = active_running_state()
+        if running:
+            st.warning("Un run est déjà en cours — lancement et purge désactivés "
+                       "jusqu'à son terme.")
+
         col1, col2 = st.columns(2)
-        if col1.button("Lancer", type="primary", use_container_width=True):
+        if col1.button("Lancer", type="primary", use_container_width=True, disabled=running):
             if label == "Purge collection":
                 st.session_state["confirm_purge"] = True
             else:
@@ -185,27 +229,54 @@ def main() -> None:
                 f"⚠️ Confirmer la purge de {config.get_collection(source)}",
                 on_click=lambda s=source: purge_collection(s),
                 use_container_width=True,
+                disabled=running,
             )
         if col2.button("Actualiser", use_container_width=True):
             st.rerun()
 
     entry = st.session_state.get("active")
     if entry:
-        rec = read_run(Path(entry["path"]))
+        path = Path(entry["path"])
+        rec = read_run(path)
+        proc = st.session_state.get("proc")
         with st.container(border=True):
             st.subheader(f"Run actif — {entry['source']} ({entry['label']})")
             if rec is None:
                 st.info("Démarrage du runner…")
             else:
                 render_run(rec)
-            if st.button("⏹️ Arrêter (kill)", key="kill"):
+            terminal = rec is not None and rec.get("status") in TERMINAL
+            if st.button("⏹️ Arrêter (kill)", key="kill", disabled=terminal):
                 kill_active(entry)
                 st.rerun()
+
         if rec is not None and rec.get("status") not in TERMINAL:
-            time.sleep(2)
+            time.sleep(1)
             st.rerun()
-        elif rec is not None and rec.get("status") in TERMINAL:
+        elif rec is not None:
+            # Statut terminal : on nettoie l'entrée active et on rafraîchit.
             st.session_state.pop("active", None)
+            st.session_state.pop("proc", None)
+            st.rerun()
+        elif proc is not None and proc.poll() is None:
+            # Fichier pas encore écrit mais process vivant : on continue de poller.
+            time.sleep(1)
+            st.rerun()
+        elif proc is not None:
+            # Le runner est mort avant d'avoir créé le fichier : run failed explicite.
+            STATUS_DIR.mkdir(parents=True, exist_ok=True)
+            start_step = START_STEPS.get(entry["label"])
+            create_run_file(path, run_id=entry["run_id"], source=entry["source"],
+                            operation="ingest", start_step=start_step,
+                            steps=[start_step] if start_step else [], status_dir=STATUS_DIR)
+            mark_failed(path, "le runner s'est arrêté avant de créer le fichier de statut")
+            st.session_state.pop("active", None)
+            st.session_state.pop("proc", None)
+            st.rerun()
+        else:
+            # Ni fichier ni process : entrée fantôme, on nettoie la session.
+            st.session_state.pop("active", None)
+            st.session_state.pop("proc", None)
             st.rerun()
 
     with st.container(border=True):
