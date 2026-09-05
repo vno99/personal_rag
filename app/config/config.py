@@ -3,7 +3,7 @@ import os
 # Constantes globales (indépendantes de la source)
 JSONL_EXT = "jsonl"
 
-WEAVIATE_HOST = "localhost"
+WEAVIATE_HOST = os.getenv("WEAVIATE_HOST", "host.docker.internal")
 WEAVIATE_PORT = 9090
 WEAVIATE_GRPC_PORT = 50051
 

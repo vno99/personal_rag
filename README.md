@@ -58,7 +58,7 @@ Le coeur du système repose sur une recherche combinant :
    Parcours des documents sources pour récupérer le contenu brut. Par défaut, le script extrait les données de la documentation Snowflake via le `sitemap.xml`.
    > **Note :** Pour modifier la source, mettez à jour les paramètres dans `./config/config.py`.
    ```bash
-   python ./app/get_docs.py
+   python ./app/get_docs.py --source snowflake
    ```
 
    #### Découpage

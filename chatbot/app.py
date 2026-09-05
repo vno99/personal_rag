@@ -260,9 +260,9 @@ def main():
                 help="Sélectionnez une ou plusieurs collections. Par défaut : toutes.",
             )
 
-            top_num = st.slider(
-                "Top sources", 
-                min_value=1, 
+            top_k_slider = st.slider(
+                "Top sources",
+                min_value=1,
                 max_value=10,
                 value=TOP_K
             )
@@ -316,7 +316,7 @@ def main():
                     # 1. Retrieval
                     result = retrieve_context(
                         prompt,
-                        top_k=top_num,
+                        top_k=top_k_slider,
                         collections=selected_collections,
                     )
 

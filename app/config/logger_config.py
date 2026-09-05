@@ -39,10 +39,10 @@ def setup_logging(name: str, config_path: str = "logging.yml", log_dir: str = "l
     
     if CONFIG_FILE.exists():
         with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-            config = yaml.safe_load(f.read())
-            config["handlers"]["file"]["filename"] = str(LOG_DIR / "app.log")
+            log_cfg = yaml.safe_load(f.read())
+            log_cfg["handlers"]["file"]["filename"] = str(LOG_DIR / "app.log")
 
-            logging.config.dictConfig(config)
+            logging.config.dictConfig(log_cfg)
     else:
         logging.basicConfig(
             level=logging.INFO,

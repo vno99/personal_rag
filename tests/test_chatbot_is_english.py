@@ -1,4 +1,4 @@
-"""Tests de base pour is_english (cf. 4e vague — coverage zéro chatbot)."""
+"""Tests de base pour is_english (réplique locale, sans dépendance chatbot/app.py)."""
 import pytest
 
 pytest.importorskip("langdetect", reason="langdetect non disponible en CI")

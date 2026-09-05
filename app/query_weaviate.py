@@ -3,7 +3,7 @@ import argparse
 import config.config as config
 import weaviate
 from langchain_huggingface import HuggingFaceEmbeddings
-from weaviate.classes.query import MetadataQuery, Filter
+from weaviate.classes.query import MetadataQuery
 
 QUERY_TEXT = "What is Unity Catalog?"
 LIMIT = 3
@@ -38,7 +38,7 @@ def main():
         response = collection.query.hybrid(
             query=QUERY_TEXT,
             vector=query_vector,
-            alpha=0.5,
+            alpha=config.ALPHA,
             limit=LIMIT,
         )
 

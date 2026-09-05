@@ -119,7 +119,7 @@ def launch_ingest(source: str, label: str) -> None:
                         start_step=start_step,
                         steps=[start_step], status_dir=STATUS_DIR)
         mark_failed(path, f"impossible de lancer le runner: {exc}")
-        # On NE populpe PAS `st.session_state["active"]` : le run est déjà
+        # On NE peuplE PAS `st.session_state["active"]` : le run est déjà
         # terminal (failed), l'UI doit afficher son message d'erreur dans
         # l'historique, pas se mettre en mode "run actif" (cf. code review B).
         return
@@ -262,6 +262,7 @@ def main() -> None:
                 st.session_state["confirm_purge_source"] = source
             else:
                 launch_ingest(source, label)
+        col3 = col2
         if st.session_state.get("confirm_purge") and label == "Purge collection":
             col2.button(
                 f"⚠️ Confirmer la purge de {config.get_collection(source)}",
@@ -269,7 +270,7 @@ def main() -> None:
                 use_container_width=True,
                 disabled=running,
             )
-        if col2.button("Actualiser", use_container_width=True):
+        if col3.button("Actualiser", use_container_width=True):
             st.rerun()
 
     entry = st.session_state.get("active")

@@ -9,7 +9,7 @@ est verrouillé par `tests/test_extract_scores.py`.
 import re
 
 
-def extract_scores(explain_score: str):
+def extract_scores(explain_score: str | None):
     """Extrait les scores bruts vector et keyword du texte `explain_score`.
 
     Args:
