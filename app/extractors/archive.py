@@ -48,9 +48,28 @@ class ArchiveExtractor(BaseExtractor):
         return extract_dir
 
     def _base_url(self) -> str:
-        # "https://docs.python.org/3.14/archives/python-3.14-docs-html.zip" -> "https://docs.python.org/3.14"
+        """Construit l'URL de base à partir de `archive_url`.
+
+        Format attendu : ``https://host/path/archives/file.zip`` →
+        ``https://host/path`` (le préfixe ``/archives/`` est la marque
+        utilisée par la doc Python officielle).
+
+        Pour les sources qui n'utilisent pas ce format, l'URL complète
+        est retournée (et produira des `source` cassées du genre
+        ``https://example.com/file.zip/page.html``). Un warning est
+        loggé pour qu'une future source utilisant un format différent
+        soit identifiée au moment de l'extraction plutôt qu'à l'usage
+        (cf. code review Q).
+        """
         if "/archives/" in self.archive_url:
             return self.archive_url.split("/archives/", 1)[0]
+        logger.warning(
+            "archive_url %r ne contient pas '/archives/' : le base_url "
+            "retourné sera l'URL complète, ce qui peut produire des "
+            "sources cassées. Adaptez _base_url si ce n'est pas le "
+            "comportement souhaité.",
+            self.archive_url,
+        )
         return self.archive_url
 
     def extract(self, progress=None) -> list[Path]:

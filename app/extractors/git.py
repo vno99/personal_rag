@@ -23,15 +23,32 @@ class GitExtractor(BaseExtractor):
         self.cache_dir = cache_dir or (Path(config.RAW_SRC_DIR) / self.name)
 
     def _clone_or_fetch(self) -> Path:
+        """Clone le dépôt (ou met à jour la branche locale) et garantit que
+        le working tree pointe sur `self.branch`.
+
+        Avant (cf. code review I), le code utilisait un `git checkout X`
+        systématique après fetch/clone, ce qui :
+        * était redondant après un `git clone --branch X` (déjà checkout)
+        * était ambigu après un `git fetch origin X` (qui ne change pas la
+          branche locale et peut laisser le working tree en detached HEAD)
+
+        Maintenant : `git fetch origin X:X` met à jour la branche locale
+        `X` en fast-forward depuis `origin/X`. Si la branche locale n'existe
+        pas, elle est créée. Pas de checkout additionnel nécessaire.
+        """
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         if (self.cache_dir / ".git").exists():
-            subprocess.run(["git", "fetch", "origin", self.branch], cwd=self.cache_dir, check=True)
+            # Fast-forward (ou création) de la branche locale depuis le remote.
+            subprocess.run(
+                ["git", "fetch", "origin", f"{self.branch}:{self.branch}"],
+                cwd=self.cache_dir, check=True,
+            )
         else:
             subprocess.run(
-                ["git", "clone", "--depth", "1", "--branch", self.branch, self.repo_url, str(self.cache_dir)],
+                ["git", "clone", "--depth", "1", "--branch", self.branch,
+                 self.repo_url, str(self.cache_dir)],
                 check=True,
             )
-        subprocess.run(["git", "-C", str(self.cache_dir), "checkout", "-q", self.branch], check=True)
         return self.cache_dir
 
     def _last_modified(self, rel_path: Path) -> str | None:

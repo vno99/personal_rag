@@ -25,8 +25,8 @@ NORMALIZE_EMBEDDINGS = config.NORMALIZE_EMBEDDINGS
 
 def get_embeddings():
     """
-    Initializes a HuggingFace embeddings object .
-    
+    Initializes a HuggingFace embeddings object.
+
     Returns:
         HuggingFaceEmbeddings: A configured instance of HuggingFaceEmbeddings
             ready to generate embeddings for text inputs.
@@ -41,7 +41,7 @@ def get_embeddings():
 def connect_client():
     """
     Connects to a Weaviate instance.
-    
+
     Returns:
         weaviate.Client: A client instance configured to connect to the specified
             Weaviate host, port, and gRPC port.
