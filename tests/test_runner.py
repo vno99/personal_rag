@@ -36,6 +36,8 @@ def test_execute_run_success_writes_done(tmp_path):
     assert rec["status"] == "done"
     assert rec["step_progress"] == {"done": 1, "total": 1}
     assert rec["pid"] is not None
+    import os
+    assert rec["pid"] == os.getpid()
 
 
 def test_execute_run_failure_marks_failed_and_stops(tmp_path):

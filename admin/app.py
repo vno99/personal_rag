@@ -127,6 +127,9 @@ def launch_ingest(source: str, label: str) -> None:
                                   "label": label, "path": str(path),
                                   "stderr_path": str(stderr_path)}
     st.session_state["proc"] = proc
+    # Le fd stderr reste ouvert tant que le runner tourne (Popen écrit
+    # dessus) ; il sera fermé au nettoyage du statut terminal (cf. 4e vague).
+    st.session_state["stderr_file"] = stderr_file
 
 
 def purge_collection(source: str) -> None:
@@ -156,6 +159,12 @@ def kill_active(entry: dict) -> None:
             proc.kill()
         except OSError:
             pass
+    stderr_file = st.session_state.pop("stderr_file", None)
+    if stderr_file is not None:
+        try:
+            stderr_file.close()
+        except Exception:
+            pass
     path = Path(entry["path"])
     rec = read_run(path)
     if rec is not None and rec.get("status") not in TERMINAL:
@@ -183,6 +192,9 @@ def render_run(rec: dict, stderr_path: str | None = None) -> None:
 
 def render_history() -> None:
     runs = list_runs(STATUS_DIR)
+    # Tri chronologique décroissant (run_id = ISO 8601 ; si un run
+    # a été modifié après son nom, le tri reste cohérent).
+    runs.sort(key=lambda r: r.get("run_id", ""), reverse=True)
     if not runs:
         st.info("Aucun run pour l'instant.")
         return
@@ -273,6 +285,12 @@ def main() -> None:
             st.rerun()
         elif rec is not None:
             # Statut terminal : on nettoie l'entrée active et on rafraîchit.
+            stderr_file = st.session_state.pop("stderr_file", None)
+            if stderr_file is not None:
+                try:
+                    stderr_file.close()
+                except Exception:
+                    pass
             st.session_state.pop("active", None)
             st.session_state.pop("proc", None)
             st.rerun()

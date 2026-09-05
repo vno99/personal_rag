@@ -74,3 +74,9 @@ def test_is_in_scope_false_below_threshold():
 
 def test_is_in_scope_false_on_empty():
     assert not is_in_scope([])
+
+
+def test_is_in_scope_at_exact_threshold():
+    """Le seuil MIN_VECTOR_SCORE = 0.45 est inclus (>=) ; au bord exact,
+    le top-1 doit être validé (cf. code review B)."""
+    assert is_in_scope([_res(10, 0.45)])
