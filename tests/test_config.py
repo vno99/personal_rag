@@ -8,9 +8,18 @@ def test_sources_is_list_of_dicts():
 
 
 def test_sources_have_required_keys():
-    required = {"name", "type", "collection", "content_selector"}
+    required = {"name", "type", "collection"}
     for source in config.SOURCES:
         assert required.issubset(source.keys())
+        if source["type"] == "sitemap":
+            assert "sitemap_url" in source
+            assert "filter_urls" in source
+        elif source["type"] == "git":
+            assert "repo_url" in source
+            assert "branch" in source
+            assert "docs_path" in source
+        elif source["type"] == "archive":
+            assert "archive_url" in source
 
 
 def test_source_names_unique():
