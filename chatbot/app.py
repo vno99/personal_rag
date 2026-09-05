@@ -71,8 +71,8 @@ FALLBACK_MESSAGES = {
 @st.cache_resource
 def get_embeddings():
     """
-    Initializes a HuggingFace embeddings object .
-    
+    Initializes a HuggingFace embeddings object.
+
     Returns:
         HuggingFaceEmbeddings: A configured instance of HuggingFaceEmbeddings
             ready to generate embeddings for text inputs.

@@ -40,3 +40,22 @@ def test_get_collection():
 def test_status_constants():
     assert config.STATUS_DIR == "./data/status"
     assert config.RUNS_HISTORY == 10
+
+
+def test_jsonl_ext_constant():
+    """`JSONL_EXT` est utilisé par chunk_docs.py et ingest_weaviate.py
+    pour le glob des fichiers : un changement de valeur casserait le
+    pipeline silencieusement (cf. code review L).
+    """
+    assert config.JSONL_EXT == "jsonl"
+
+
+def test_docs_and_chunks_patterns():
+    """Les patterns dérivés du nom de source sont utilisés par les scripts
+    de pipeline pour trouver leurs fichiers : un changement de format
+    doit être explicite, pas accidentel.
+    """
+    assert config.docs_pattern("python") == "python_docs_batch_"
+    assert config.chunks_pattern("python") == "python_chunks_batch_"
+    assert config.docs_pattern("nextjs") == "nextjs_docs_batch_"
+    assert config.chunks_pattern("nextjs") == "nextjs_chunks_batch_"
