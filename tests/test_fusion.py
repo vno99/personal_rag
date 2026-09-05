@@ -24,6 +24,23 @@ def test_normalize_minmax_flat_scores_are_all_one():
     assert out[1]["norm_score"] == 1.0
 
 
+def test_fuse_drops_results_without_vector_score():
+    """Sans `vector_score`, un résultat ne peut pas être retenu par
+    `is_in_scope` (cf. code review #1). `fuse` l'exclut en amont pour
+    éviter que son `norm_score=1.0` de repli ne pollue le tri fusionné.
+    """
+    col = [
+        _res(10, 0.5),
+        _res(20, 0.6),
+        {"hybrid_score": 100, "vector_score": None, "content": "x"},
+    ]
+    fused = fuse([col], top_k=3)
+    # Les deux résultats avec vector_score sont conservés et triés.
+    assert len(fused) == 2
+    assert fused[0]["hybrid_score"] == 20
+    assert fused[1]["hybrid_score"] == 10
+
+
 def test_fuse_orders_by_norm_score_desc():
     col_a = [_res(100, 0.5), _res(200, 0.6)]   # normés en interne -> 0.0, 1.0
     col_b = [_res(10, 0.7), _res(20, 0.8)]     # normés en interne -> 0.0, 1.0

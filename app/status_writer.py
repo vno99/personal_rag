@@ -99,9 +99,15 @@ def mark_failed(path, error) -> dict:
     return rec
 
 
-def mark_cancelled(path) -> dict:
+def mark_cancelled(path, last_message: str = "annulé") -> dict:
+    """Marque le run comme `cancelled`.
+
+    L'appelant peut passer un `last_message` métier (par ex. "chunking 5/10
+    au moment de l'arrêt") pour préserver la progression visible dans l'UI
+    au lieu du libellé générique "annulé".
+    """
     rec = update_run_file(path, status="cancelled", finished_at=_now_iso(),
-                          error=None, last_message="annulé")
+                          error=None, last_message=last_message)
     _refresh_latest(path)
     return rec
 

@@ -47,6 +47,20 @@ def test_transitions(tmp_path):
     assert rec["status"] == "cancelled" and rec["error"] is None
 
 
+def test_mark_cancelled_preserves_custom_last_message(tmp_path):
+    """L'appelant peut passer un `last_message` métier pour ne pas perdre
+    la progression visible dans l'UI au moment de l'arrêt (cf. code review #9).
+    """
+    path = status_path(tmp_path, "r1", "python")
+    create_run_file(path, run_id="r1", source="python", operation="ingest",
+                    start_step="get_docs", steps=["get_docs"], status_dir=tmp_path)
+    update_run_file(path, last_message="chunking 5/10")
+    mark_cancelled(path, last_message="chunking 5/10 (annulé)")
+    rec = read_run(path)
+    assert rec["status"] == "cancelled"
+    assert rec["last_message"] == "chunking 5/10 (annulé)"
+
+
 def test_update_run_file_missing_raises(tmp_path):
     path = status_path(tmp_path, "r1", "python")
     with pytest.raises(FileNotFoundError):

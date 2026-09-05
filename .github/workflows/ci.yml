@@ -22,11 +22,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
-          # Override torch with CPU version for CI
+          # Install the project's non-torch deps from a dedicated file, then
+          # overlay the CPU torch build. requirements-ci.txt is the source of
+          # truth for non-torch deps: do not re-list versions here, otherwise
+          # a future addition to requirements.txt is silently missed by CI.
+          pip install -r requirements-ci.txt
           pip install torch==2.6.0+cpu torchvision==0.21.0+cpu torchaudio==2.6.0+cpu --index-url https://download.pytorch.org/whl/cpu
-          # Install core dependencies (without torch packages from requirements.txt)
-          pip install langchain-community==0.4.1 lxml==6.1.0 beautifulsoup4==4.14.3 tqdm==4.67.3
-          pip install transformers==5.6.2 weaviate-client==4.21.0 langchain_huggingface==1.2.2 sentence-transformers==5.4.1
 
       - name: Run tests
         run: |
