@@ -174,7 +174,7 @@ def retrieve_context(query_text, top_k=TOP_K, collections=None):
         top_k (int, optional): Nombre de résultats à garder après fusion.
             Defaults to TOP_K.
         collections (list[str], optional): Noms des collections à interroger.
-            Defaults to [COLLECTION_NAME].
+            Defaults to COL_NAME_LIST (toutes les collections indexées).
 
     Returns:
         dict: 'in_scope' (bool), 'reason' (str), 'context' (str),
