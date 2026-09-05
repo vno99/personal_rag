@@ -3,6 +3,8 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 from langchain_community.document_loaders.sitemap import SitemapLoader
 
+import config.config as config
+
 from extractors.base import BaseExtractor
 from extractors.html_content import extract_from_soup
 
@@ -50,8 +52,7 @@ class SitemapExtractor(BaseExtractor):
         )
         loader.requests_kwargs = {
             "headers": {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0 Safari/537.36",
+                "User-Agent": config.USER_AGENT,
             },
             "timeout": 30,
         }

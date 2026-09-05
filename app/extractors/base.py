@@ -5,6 +5,8 @@ from typing import Callable
 
 from config.config import docs_pattern
 
+__all__ = ["BaseExtractor", "ProgressCallback"]
+
 ProgressCallback = Callable[[int, int | None], None]
 
 

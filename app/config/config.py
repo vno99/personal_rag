@@ -1,3 +1,5 @@
+import os
+
 # Constantes globales (indépendantes de la source)
 JSONL_EXT = "jsonl"
 
@@ -11,6 +13,11 @@ RAW_SRC_DIR = "./data/raw_src"
 
 STATUS_DIR = "./data/status"
 RUNS_HISTORY = 10
+
+USER_AGENT = os.getenv(
+    "RAG_USER_AGENT",
+    "personal-rag/1.0 (compatible; +https://github.com/vno99/personal_rag)",
+)
 
 CHUNK_TOKENIZER = "sentence-transformers/all-mpnet-base-v2"
 CHUNK_SIZE = 500
