@@ -1,5 +1,4 @@
 import os
-import re
 
 import streamlit as st
 import torch
@@ -10,6 +9,7 @@ from langdetect import detect
 from weaviate.classes.query import HybridFusion, MetadataQuery
 from deep_translator import GoogleTranslator
 
+from extract_scores import extract_scores
 from fusion import fuse, is_in_scope
 
 WEAVIATE_HOST = "host.docker.internal"
@@ -94,37 +94,6 @@ def connect_client():
         port=WEAVIATE_PORT,
         grpc_port=WEAVIATE_GRPC_PORT
     )
-
-
-def extract_scores(explain_score: str):
-    """
-    Extracts raw vector and keyword scores from the explain_score string.
-
-    Args:
-        explain_score (str): The explanation string containing the score details.
-
-    Returns:
-        A tuple containing (vector_score, keyword_score).
-            Returns (None, None) if the input is empty or no matches are found.
-    """
-    if not explain_score:
-        return None, None
-
-    vector_match = re.search(
-        r"Result Set vector,?\s*hybridVector.*?original score ([0-9.]+)",
-        explain_score,
-        flags=re.IGNORECASE | re.DOTALL,
-    )
-    keyword_match = re.search(
-        r"Result Set keyword,?\s*bm25.*?original score ([0-9.]+)",
-        explain_score,
-        flags=re.IGNORECASE | re.DOTALL,
-    )
-
-    vector_score = float(vector_match.group(1)) if vector_match else None
-    keyword_score = float(keyword_match.group(1)) if keyword_match else None
-
-    return vector_score, keyword_score
 
 
 def is_english(text):
@@ -387,7 +356,9 @@ def main():
                                     st.markdown(f"**#{i+1}** [{src}]({src})")
 
                 except Exception as e:
-                    full_response = f"Erreur: {str(e)}"
+                    full_response = f"⚠️ Erreur : {e}"
+                    st.session_state.messages.append({"role": "assistant", "content": full_response})
+                    st.error(full_response)
                 
 
     st.markdown("---")

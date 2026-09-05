@@ -47,11 +47,15 @@ def fuse(results_by_collection, top_k=3):
 
     Returns:
         list[dict]: Résultats fusionnés et triés, chaque dict ayant `norm_score`.
+            Les résultats sans `vector_score` (regex explain_score a échoué)
+            sont filtrés : ils ne peuvent pas être retenus par `is_in_scope`
+            et le tie-break `vector_score` les aurait favorisés artificiellement.
     """
     normalized = [
         item
         for collection in results_by_collection
         for item in normalize_minmax(collection)
+        if item.get("vector_score") is not None
     ]
     normalized.sort(
         key=lambda r: (r["norm_score"], r.get("vector_score") or 0.0),
