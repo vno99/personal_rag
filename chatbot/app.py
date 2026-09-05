@@ -85,14 +85,9 @@ def get_embeddings():
 
 embeddings = get_embeddings()
 
+@st.cache_resource
 def connect_client():
-    """
-    Connects to a Weaviate instance.
-    
-    Returns:
-        weaviate.Client: A client instance configured to connect to the specified
-        Weaviate host, port, and gRPC port.
-    """
+    """Singleton Weaviate client (évite la reconnexion par tour)."""
     return weaviate.connect_to_local(
         host=WEAVIATE_HOST,
         port=WEAVIATE_PORT,
@@ -121,7 +116,7 @@ def _escape_context(context: str) -> str:
     return context
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=60)  # Réduit le ttl (confidentialité, cf. 6e vague).
 def translate_to_english(text):
     """Translates the input text to English using Google Translate.
 
@@ -193,57 +188,53 @@ def retrieve_context(query_text, top_k=TOP_K, collections=None):
     query_vector = embeddings.embed_query(query_text_en)
     client = connect_client()
 
-    try:
-        # Ignore les collections configurées mais non encore ingérées en base
-        existing = [name for name in collections if client.collections.exists(name)]
-        if not existing:
-            return {
-                "in_scope": False,
-                "reason": "no_results",
-                "context": "",
-                "sources": [],
-                "debug": [],
-            }
-
-        results_by_collection = [
-            query_one_collection(client, name, query_text_en, query_vector, top_k)
-            for name in existing
-        ]
-
-        fused = fuse(results_by_collection, top_k=top_k)
-
-        if not fused:
-            return {
-                "in_scope": False,
-                "reason": "no_results",
-                "context": "",
-                "sources": [],
-                "debug": [],
-            }
-
-        if not is_in_scope(fused, min_vector_score=MIN_VECTOR_SCORE):
-            top1 = fused[0]["vector_score"]
-            return {
-                "in_scope": False,
-                "reason": f"vector_score_too_low ({top1} < {MIN_VECTOR_SCORE})",
-                "context": "",
-                "sources": [],
-                "debug": fused,
-            }
-
-        context = "\n\n".join([r["content"] for r in fused if r.get("content")])
-        sources = [r["source"] for r in fused]
-
+    # Ignore les collections configurées mais non encore ingérées en base
+    existing = [name for name in collections if client.collections.exists(name)]
+    if not existing:
         return {
-            "in_scope": True,
-            "reason": "ok",
-            "context": context,
-            "sources": sources,
+            "in_scope": False,
+            "reason": "no_results",
+            "context": "",
+            "sources": [],
+            "debug": [],
+        }
+
+    results_by_collection = [
+        query_one_collection(client, name, query_text_en, query_vector, top_k)
+        for name in existing
+    ]
+
+    fused = fuse(results_by_collection, top_k=top_k)
+
+    if not fused:
+        return {
+            "in_scope": False,
+            "reason": "no_results",
+            "context": "",
+            "sources": [],
+            "debug": [],
+        }
+
+    if not is_in_scope(fused, min_vector_score=MIN_VECTOR_SCORE):
+        top1 = fused[0]["vector_score"]
+        return {
+            "in_scope": False,
+            "reason": f"vector_score_too_low ({top1} < {MIN_VECTOR_SCORE})",
+            "context": "",
+            "sources": [],
             "debug": fused,
         }
 
-    finally:
-        client.close()
+    context = "\n\n".join([r["content"] for r in fused if r.get("content")])
+    sources = [r["source"] for r in fused]
+
+    return {
+        "in_scope": True,
+        "reason": "ok",
+        "context": context,
+        "sources": sources,
+        "debug": fused,
+    }
 
 
 def main():
@@ -314,6 +305,8 @@ def main():
     if prompt := st.chat_input("Pose ta question ...", key="chat_input"):
         # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
+        # Cap mémoire après chaque ajout (cf. 6e vague).
+        st.session_state.messages = st.session_state.messages[-20:]
         with st.chat_message("user"):
             st.markdown(prompt)
         
@@ -352,7 +345,7 @@ def main():
                         AVAILABLE CONTEXT:
                         {_escape_context(context)}
 
-                        QUESTION: {prompt}
+                        QUESTION: {_escape_context(prompt)}
 
                         <|instructions|>
                         1. Provide a concise and complete answer. 
@@ -376,6 +369,8 @@ def main():
                             "sources": result["sources"]
                         }
                         st.session_state.messages.append(message)
+                        # Cap mémoire après chaque ajout (cf. 6e vague).
+                        st.session_state.messages = st.session_state.messages[-20:]
 
                         # Show the response
                         st.markdown(full_response)
