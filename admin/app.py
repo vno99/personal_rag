@@ -103,17 +103,29 @@ def launch_ingest(source: str, label: str) -> None:
         "--source", source, "--run-id", run_id,
         "--operation", "ingest", "--start-step", start_step,
     ]
-    proc = None
+    STATUS_DIR.mkdir(parents=True, exist_ok=True)
+    # stderr est capturé dans un fichier log consultable depuis l'UI :
+    # si le runner crash avant d'écrire un fichier de statut (import échoué,
+    # OOM, etc.), on a au moins la trace de l'erreur (cf. code review A).
+    stderr_path = STATUS_DIR / f"{run_id}_{source}.stderr.log"
+    stderr_file = stderr_path.open("w", encoding="utf-8")
     try:
-        proc = subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except Exception as exc:  # ex. python introuvable : on trace un run failed
-        STATUS_DIR.mkdir(parents=True, exist_ok=True)
+        proc = subprocess.Popen(
+            cmd, cwd=ROOT, stdout=subprocess.DEVNULL, stderr=stderr_file,
+        )
+    except Exception as exc:  # ex. python introuvable
+        stderr_file.close()
         create_run_file(path, run_id=run_id, source=source, operation="ingest",
                         start_step=start_step,
                         steps=[start_step], status_dir=STATUS_DIR)
         mark_failed(path, f"impossible de lancer le runner: {exc}")
+        # On NE populpe PAS `st.session_state["active"]` : le run est déjà
+        # terminal (failed), l'UI doit afficher son message d'erreur dans
+        # l'historique, pas se mettre en mode "run actif" (cf. code review B).
+        return
     st.session_state["active"] = {"run_id": run_id, "source": source,
-                                  "label": label, "path": str(path)}
+                                  "label": label, "path": str(path),
+                                  "stderr_path": str(stderr_path)}
     st.session_state["proc"] = proc
 
 
@@ -152,7 +164,7 @@ def kill_active(entry: dict) -> None:
     st.session_state.pop("proc", None)
 
 
-def render_run(rec: dict) -> None:
+def render_run(rec: dict, stderr_path: str | None = None) -> None:
     st.markdown(f"**Statut :** `{rec.get('status')}` — étape : `{rec.get('step') or '—'}`")
     prog = rec.get("step_progress") or {}
     done, total = prog.get("done", 0), prog.get("total")
@@ -161,6 +173,12 @@ def render_run(rec: dict) -> None:
     st.write(f"PID : `{rec.get('pid')}` — {rec.get('last_message') or ''}")
     if rec.get("error"):
         st.error(rec["error"])
+    if stderr_path and Path(stderr_path).exists():
+        size = Path(stderr_path).stat().st_size
+        if size > 0:
+            st.caption(f"📄 stderr log : `{stderr_path}` ({size} octets)")
+            with open(stderr_path, "r", encoding="utf-8", errors="replace") as f:
+                st.code(f.read()[-2000:], language="bash")
 
 
 def render_history() -> None:
@@ -244,7 +262,7 @@ def main() -> None:
             if rec is None:
                 st.info("Démarrage du runner…")
             else:
-                render_run(rec)
+                render_run(rec, stderr_path=entry.get("stderr_path"))
             terminal = rec is not None and rec.get("status") in TERMINAL
             if st.button("⏹️ Arrêter (kill)", key="kill", disabled=terminal):
                 kill_active(entry)

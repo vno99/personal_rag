@@ -35,7 +35,9 @@ class ArchiveExtractor(BaseExtractor):
         if local_candidate.exists():
             shutil.copyfile(local_candidate, dest)
         else:
-            urllib.request.urlretrieve(self.archive_url, dest)
+            # Timeout : si le serveur ne répond pas, on lève TimeoutError
+            # au lieu de bloquer indéfiniment (cf. code review D).
+            urllib.request.urlretrieve(self.archive_url, dest, timeout=60)
         return dest
 
     def _extract_zip(self, archive: Path) -> Path:

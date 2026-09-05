@@ -24,7 +24,7 @@ def test_archive_extractor_parses_html(tmp_path, monkeypatch):
     archive = make_local_zip(tmp_path)
 
     # Évite le téléchargement réseau : on redirige urlretrieve vers le zip local.
-    def fake_urlretrieve(url: str, dest: str | Path):
+    def fake_urlretrieve(url: str, dest: str | Path, timeout: int | None = None):
         shutil.copyfile(archive, dest)
 
     monkeypatch.setattr("urllib.request.urlretrieve", fake_urlretrieve)
@@ -55,7 +55,7 @@ def test_archive_extractor_parses_html(tmp_path, monkeypatch):
 def test_archive_extractor_reports_progress(tmp_path, monkeypatch):
     archive = make_local_zip(tmp_path)
 
-    def fake_urlretrieve(url: str, dest):
+    def fake_urlretrieve(url: str, dest, timeout: int | None = None):
         shutil.copyfile(archive, dest)
 
     monkeypatch.setattr("urllib.request.urlretrieve", fake_urlretrieve)

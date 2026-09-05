@@ -100,3 +100,32 @@ def test_latest_and_prune(tmp_path):
     left = sorted(p.name for p in tmp_path.glob("*.json") if p.name != "latest.json")
     assert left == ["2026-09-02T17-00-00_python.json", "2026-09-02T18-00-00_python.json"]
     assert (tmp_path / "latest.json").exists()
+
+
+def test_prune_history_keeps_most_recent_by_mtime(tmp_path):
+    """`prune_history` doit garder les N plus récents par date de modification,
+    pas par nom de fichier (cf. code review H : le tri lexicographique des
+    run_id ISO 8601 ne coïncide avec l'ordre chrono que par accident).
+    """
+    import time
+    # On crée 3 fichiers mais on force des mtime différents ET on utilise
+    # des noms dont l'ordre alphabétique est inversé par rapport au mtime.
+    files = []
+    for i, (rid, mtime) in enumerate([
+        ("2026-09-02T18-00-00", 1000.0),  # alphabétiquement dernier, mais le plus ancien
+        ("2026-09-02T16-00-00", 3000.0),  # alphabétiquement premier, mais le plus récent
+        ("2026-09-02T17-00-00", 2000.0),
+    ]):
+        path = status_path(tmp_path, rid, "python")
+        create_run_file(path, run_id=rid, source="python",
+                        operation="ingest", start_step="get_docs", steps=["get_docs"],
+                        status_dir=tmp_path)
+        # mtime en secondes (résolution 1s sur certains FS)
+        import os
+        os.utime(path, (mtime, mtime))
+        files.append(path)
+
+    prune_history(tmp_path, keep=1)
+    remaining = {p.name for p in tmp_path.glob("*_python.json")}
+    # Seul le plus récent (par mtime, pas par nom) doit rester.
+    assert remaining == {"2026-09-02T16-00-00_python.json"}
