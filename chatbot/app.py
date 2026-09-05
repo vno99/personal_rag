@@ -333,11 +333,11 @@ def main():
                             context = result["context"]
 
                             llm = ChatMistralAI(
-                            model=LLM_MODEL,
-                            api_key=MISTRAL_API_KEY,
-                            temperature=TEMPERATURE,
-                            max_tokens=MAX_TOKEN,
-                        )
+                                model=LLM_MODEL,
+                                api_key=MISTRAL_API_KEY,
+                                temperature=TEMPERATURE,
+                                max_tokens=MAX_TOKEN,
+                            )
 
                         rag_prompt = f"""<|role|>EXPERT<|end|>
 
@@ -388,7 +388,5 @@ def main():
 
     st.markdown("---")
     st.markdown("")
-
-
 if __name__ == "__main__":
     main()

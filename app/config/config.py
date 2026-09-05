@@ -19,6 +19,8 @@ USER_AGENT = os.getenv(
     "personal-rag/1.0 (compatible; +https://github.com/vno99/personal_rag)",
 )
 
+ALPHA = 0.7
+
 CHUNK_TOKENIZER = "sentence-transformers/all-mpnet-base-v2"
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 75

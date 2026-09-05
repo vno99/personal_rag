@@ -4,7 +4,6 @@ import uuid
 from pathlib import Path
 
 import config.config as config
-import torch
 import weaviate
 from config.logger_config import setup_logging
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -19,7 +18,7 @@ WEAVIATE_PORT = config.WEAVIATE_PORT
 WEAVIATE_GRPC_PORT = config.WEAVIATE_GRPC_PORT
 BATCH_SIZE_WEAVIATE = config.BATCH_SIZE_WEAVIATE
 EMBEDDING_MODEL_NAME = config.EMBEDDING_MODEL_NAME
-EMBEDDING_DEVICE = config.EMBEDDING_DEVICE if torch.cuda.is_available() else "cpu"
+EMBEDDING_DEVICE = config.EMBEDDING_DEVICE
 NORMALIZE_EMBEDDINGS = config.NORMALIZE_EMBEDDINGS
 
 

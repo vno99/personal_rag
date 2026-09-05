@@ -23,7 +23,7 @@ Le coeur du système repose sur une recherche combinant :
 
 ### 🛠️ Stack Technique
 *   **Frontend :** [Streamlit](https://streamlit.io/) (Interface utilisateur interactive).
-*   **Vector Database :** [Weaviate](httpsh://weaviate.io/) (Stockage et recherche hybride ultra-rapide).
+*   **Vector Database :** [Weaviate](https://weaviate.io/) (Stockage et recherche hybride ultra-rapide).
 *   **LLM :** Génération Mistral (`ChatMistralAI`) — modèle par défaut `mistral-medium-latest`, surchargeable via `MISTRAL_MODEL`.
 *   **Modèle d'Embeddings :** `sentence-transformers/all-mpnet-base-v2`.
 
@@ -56,7 +56,7 @@ Le coeur du système repose sur une recherche combinant :
 
    #### Extraction
    Parcours des documents sources pour récupérer le contenu brut. Par défaut, le script extrait les données de la documentation Snowflake via le `sitemap.xml`.
-   > **Note :** Pour modifier la source, mettez à jour les paramètres dans `./config/config.py`.
+   > **Note :** Pour modifier la source, mettez à jour les paramètres dans `app/config/config.py`.
    ```bash
    python ./app/get_docs.py --source snowflake
    ```
@@ -64,13 +64,13 @@ Le coeur du système repose sur une recherche combinant :
    #### Découpage
    Une fois les documents récupérés, ils sont découpés en segments plus petits (chunks) optimisés pour la recherche vectorielle et la fenêtre de contexte du LLM.
    ```bash
-   python ./app/chunk_docs.py
+   python ./app/chunk_docs.py --source snowflake
    ```
 
    #### Indexation
    Cette étape transforme les segments de texte en embeddings et les stocke dans la base de données Weaviate.
    ```bash
-   python ./app/ingest_weaviate.py
+   python ./app/ingest_weaviate.py --source snowflake
    ```
 
 3. **Lancer Weaviate**
