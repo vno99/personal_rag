@@ -61,8 +61,13 @@ class SitemapExtractor(BaseExtractor):
         written: list[Path] = []
         blocknum = self._find_next_batch_num()
         done = 0
+        # Garde-fou : on borne le nombre de blocs au cas où SitemapLoader
+        # changerait son message d'erreur ou ne lèverait plus. 10000 blocs *
+        # batch_size 500 = 5M docs, largement au-dessus de ce qu'on ingère
+        # réellement (cf. code review C).
+        max_blocks = 10000
 
-        while True:
+        while blocknum < max_blocks:
             loader = self._make_loader(blocknum)
             try:
                 docs = loader.load()

@@ -12,11 +12,15 @@ from deep_translator import GoogleTranslator
 from extract_scores import extract_scores
 from fusion import fuse, is_in_scope
 
-WEAVIATE_HOST = "host.docker.internal"
-WEAVIATE_PORT = 9090
-WEAVIATE_GRPC_PORT = 50051
+WEAVIATE_HOST = os.getenv("WEAVIATE_HOST", "host.docker.internal")
+WEAVIATE_PORT = int(os.getenv("WEAVIATE_PORT", "9090"))
+WEAVIATE_GRPC_PORT = int(os.getenv("WEAVIATE_GRPC_PORT", "50051"))
 COLLECTION_NAME = "DatabricksDocs"
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
+# Sentinelle du `.env_example` : si l'utilisateur a copié le template sans
+# remplacer la valeur, on l'alerte plutôt que de le laisser échouer à la
+# première question (cf. code review E).
+_MISTRAL_SENTINEL = "aaaaaaaaaaaaaaaaaaa"
 
 EMBEDDING_MODEL = "sentence-transformers/all-mpnet-base-v2"
 
@@ -263,6 +267,13 @@ def main():
                 "Langue de la réponse",
                 LANGUAGES,
                 index=2 # Français
+            )
+
+        if not MISTRAL_API_KEY or MISTRAL_API_KEY == _MISTRAL_SENTINEL:
+            st.warning(
+                "⚠️ `MISTRAL_API_KEY` non définie (ou valeur sentinelle du "
+                "`.env_example`). Copie `.env_example` vers `.env` et "
+                "remplace la valeur. Les réponses LLM échoueront sinon.",
             )
 
         if st.button("Tout effacer"):

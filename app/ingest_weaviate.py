@@ -235,6 +235,12 @@ def run(source_name: str, status=None) -> None:
         return
 
     logger.info(f"{len(input_files)} fichiers trouvés dans {CHUNKS_DATA_DIR}")
+    # Le comptage re-ouvre les JSONL (un générateur ne matérialise pas en RAM,
+    # c'est juste un I/O disque supplémentaire). On accepte ce coût pour que
+    # la barre de progression affiche un total exact dès le départ, plutôt
+    # qu'un `?`/`None` qui dégrade l'UX de l'app d'administration. Pour
+    # l'optimiser, on pourrait compter par fichier (f.stat().st_size // avg_line)
+    # mais l'approximation serait moins fiable que le comptage exact.
     total = sum(1 for f in input_files for _ in read_jsonl_file(f))
     logger.info(f"{total} chunks à ingérer")
 

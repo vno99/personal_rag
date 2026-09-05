@@ -143,11 +143,20 @@ def list_runs(status_dir) -> list[dict]:
 
 
 def prune_history(status_dir, keep: int = config.RUNS_HISTORY) -> None:
+    """Supprime les plus anciens runs, en gardant les `keep` plus récents.
+
+    On trie par `mtime` et non par nom de fichier : l'ordre lexicographique
+    des `run_id` au format ISO 8601 coïncide avec l'ordre chronologique, mais
+    c'est par accident. Un changement de format de `run_id` casserait la
+    sémantique « garder les N plus récents » silencieusement (cf. code review H).
+    """
     status_dir = Path(status_dir)
     if not status_dir.exists():
         return
-    files = sorted(f for f in status_dir.glob("*.json") if f.name != "latest.json")
-    for f in files[:-keep] if keep else files:
+    files = [f for f in status_dir.glob("*.json") if f.name != "latest.json"]
+    # Plus récent d'abord.
+    files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+    for f in files[keep:]:
         f.unlink(missing_ok=True)
 
 
