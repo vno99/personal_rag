@@ -101,15 +101,24 @@ def connect_client():
 
 
 def is_english(text):
-    """Checks if the provided text is in English.
+    """Checks if the provided text is in English. Protects against
+    `LangDetectException` (empty text, too short)."""
+    try:
+        return detect(text) == 'en'
+    except Exception:
+        return False
 
-    Args:
-        text (str): The text to evaluate.
 
-    Returns:
-        bool: True if the detected language is English, False otherwise.
-    """
-    return detect(text) == 'en'
+# Protects against prompt injection via indexed chunks.
+_INJECTION_TAGS = ["<|instructions|>", "<|end|>", "<|role|>", "<|system|>",
+                    "<|user|>", "<|assistant|>"]
+
+
+def _escape_context(context: str) -> str:
+    """Strips injection tags from retrieved context before RAG prompt."""
+    for tag in _INJECTION_TAGS:
+        context = context.replace(tag, "")
+    return context
 
 
 @st.cache_data(ttl=3600)
@@ -122,7 +131,12 @@ def translate_to_english(text):
     Returns:
         str: The translated text in English.
     """
-    return GoogleTranslator(source='auto', target='en').translate(text)
+    try:
+        return GoogleTranslator(source='auto', target='en').translate(text)
+    except Exception:
+        # Fallback : retourne le texte original si la traduction échoue
+        # (défaut réseau, service indisponible, etc.).
+        return text
 
 
 def query_one_collection(client, collection_name, query_text_en, query_vector, top_k):
@@ -293,8 +307,8 @@ def main():
             # Show sources if available
             if "sources" in message and message["sources"]:
                 with st.expander("📚 Sources"):
-                    for i, src in enumerate(message["sources"]):
-                        st.markdown(f"**#{i+1}** [{src}]({src})")
+                    for idx, src in enumerate(message["sources"]):
+                        st.markdown(f"**#{idx+1}** [{src}]({src})")
 
     # Accept user input
     if prompt := st.chat_input("Pose ta question ...", key="chat_input"):
@@ -318,9 +332,15 @@ def main():
                         fallback = FALLBACK_MESSAGES[selected_language]
                         st.markdown(fallback)
                     else:
-                        context = result["context"]
-                    
-                        llm = ChatMistralAI(
+                        # Si la clé Mistral est manquante/sentinelle, on évite
+                        # de créer le LLM (coût réseau) et on retourne un fallback.
+                        if not MISTRAL_API_KEY or MISTRAL_API_KEY == _MISTRAL_SENTINEL:
+                            fallback = FALLBACK_MESSAGES[selected_language]
+                            st.markdown(fallback)
+                        else:
+                            context = result["context"]
+
+                            llm = ChatMistralAI(
                             model=LLM_MODEL,
                             api_key=MISTRAL_API_KEY,
                             temperature=TEMPERATURE,
@@ -330,7 +350,7 @@ def main():
                         rag_prompt = f"""<|role|>EXPERT<|end|>
 
                         AVAILABLE CONTEXT:
-                        {context}
+                        {_escape_context(context)}
 
                         QUESTION: {prompt}
 

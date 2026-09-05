@@ -157,6 +157,7 @@ def kill_active(entry: dict) -> None:
     if proc is not None:
         try:
             proc.kill()
+            proc.wait()  # Évite le zombie OS (cf. 5e vague admin).
         except OSError:
             pass
     stderr_file = st.session_state.pop("stderr_file", None)
@@ -242,6 +243,12 @@ def main() -> None:
 
         if label != "Purge collection":
             st.session_state["confirm_purge"] = False
+        else:
+            # Si la source a changé depuis le clic Lancer, réinitialiser
+            # pour éviter la purge d'une source non confirmée (cf. 5e vague).
+            last_confirm_source = st.session_state.get("confirm_purge_source")
+            if last_confirm_source is not None and last_confirm_source != source:
+                st.session_state["confirm_purge"] = False
 
         running = active_running_state()
         if running:
@@ -252,6 +259,7 @@ def main() -> None:
         if col1.button("Lancer", type="primary", use_container_width=True, disabled=running):
             if label == "Purge collection":
                 st.session_state["confirm_purge"] = True
+                st.session_state["confirm_purge_source"] = source
             else:
                 launch_ingest(source, label)
         if st.session_state.get("confirm_purge") and label == "Purge collection":
@@ -300,6 +308,17 @@ def main() -> None:
             st.rerun()
         elif proc is not None:
             # Le runner est mort avant d'avoir créé le fichier : run failed explicite.
+            # On attend la terminaison (évite zombie) et ferme le fd stderr.
+            try:
+                proc.wait()
+            except Exception:
+                pass
+            stderr_file = st.session_state.pop("stderr_file", None)
+            if stderr_file is not None:
+                try:
+                    stderr_file.close()
+                except Exception:
+                    pass
             STATUS_DIR.mkdir(parents=True, exist_ok=True)
             start_step = START_STEPS.get(entry["label"])
             create_run_file(path, run_id=entry["run_id"], source=entry["source"],

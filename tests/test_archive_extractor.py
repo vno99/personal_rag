@@ -27,7 +27,11 @@ def test_archive_extractor_parses_html(tmp_path, monkeypatch):
     def fake_urlretrieve(url: str, dest: str | Path, timeout: int | None = None):
         shutil.copyfile(archive, dest)
 
-    monkeypatch.setattr("urllib.request.urlretrieve", fake_urlretrieve)
+    def fake_urlopen(url, timeout=None):
+        import io
+        return io.BytesIO(open(archive, "rb").read())
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
 
     source = {
         "name": "python",
@@ -58,7 +62,11 @@ def test_archive_extractor_reports_progress(tmp_path, monkeypatch):
     def fake_urlretrieve(url: str, dest, timeout: int | None = None):
         shutil.copyfile(archive, dest)
 
-    monkeypatch.setattr("urllib.request.urlretrieve", fake_urlretrieve)
+    def fake_urlopen(url, timeout=None):
+        import io
+        return io.BytesIO(open(archive, "rb").read())
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
     source = {
         "name": "python", "type": "archive",
         "archive_url": f"https://docs.python.org/3.14/archives/{archive.name}",
