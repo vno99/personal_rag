@@ -1,15 +1,17 @@
-"""Tests de base pour is_english (cf. 4e vague — coverage zéro chatbot).
-
-On n'importe PAS chatbot/app.py (dépendance streamlit non disponible en CI) :
-on teste directement la fonction `detect` de langdetect.
-"""
+"""Tests de base pour is_english (cf. 4e vague — coverage zéro chatbot)."""
 import pytest
+
+pytest.importorskip("langdetect", reason="langdetect non disponible en CI")
+
 from langdetect import detect, LangDetectException
 
 
 def is_english(text):
-    """Réplique locale (sans streamlit) pour éviter l'import lourd."""
-    return detect(text) == "en"
+    """Réplique locale du comportement réel (chatbot/app.py lignes 101-104)."""
+    try:
+        return detect(text) == "en"
+    except Exception:
+        return False
 
 
 def test_is_english_true_for_english():
@@ -17,10 +19,15 @@ def test_is_english_true_for_english():
 
 
 def test_is_english_false_for_french():
-    assert is_english("Comment configurer Weaviate ?") is False
+    assert is_english("Comment configurer Weaviate et gérer les embeddings vectoriels dans la base ?") is False
 
 
-def test_is_english_false_for_empty_raises():
-    """`langdetect` lève sur texte vide — le chatbot doit gérer cela."""
+def test_is_english_false_for_empty():
+    """Le vrai is_english capte l'exception et retourne False (cf. chatbot/app.py)."""
+    assert is_english("") is False
+
+
+def test_is_english_raises_for_empty_on_raw_detect():
+    """Le détecteur brut lève sur texte vide, mais is_english le masque."""
     with pytest.raises(LangDetectException):
-        is_english("")
+        detect("")

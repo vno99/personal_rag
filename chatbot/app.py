@@ -15,7 +15,6 @@ from fusion import fuse, is_in_scope
 WEAVIATE_HOST = os.getenv("WEAVIATE_HOST", "host.docker.internal")
 WEAVIATE_PORT = int(os.getenv("WEAVIATE_PORT", "9090"))
 WEAVIATE_GRPC_PORT = int(os.getenv("WEAVIATE_GRPC_PORT", "50051"))
-COLLECTION_NAME = "DatabricksDocs"
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
 # Sentinelle du `.env_example` : si l'utilisateur a copié le template sans
 # remplacer la valeur, on l'alerte plutôt que de le laisser échouer à la
@@ -182,7 +181,7 @@ def retrieve_context(query_text, top_k=TOP_K, collections=None):
               'sources' (list), 'debug' (list, résultats fusionnés).
     """
     if collections is None:
-        collections = [COLLECTION_NAME]
+        collections = COL_NAME_LIST
 
     query_text_en = translate_to_english(query_text) if not is_english(query_text) else query_text
     query_vector = embeddings.embed_query(query_text_en)
@@ -291,7 +290,7 @@ def main():
         st.session_state.messages = []
 
     # Display chat messages from history on app rerun
-    for i, message in enumerate(st.session_state.messages):
+    for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
@@ -349,8 +348,8 @@ def main():
 
                         <|instructions|>
                         1. Provide a concise and complete answer. 
-                           Stick strictly to the provided context. 
-                           If the information is dense, use bullet points to maintain clarity CONTEXT.
+                           Stick strictly to the provided context.
+                           If the information is dense, use bullet points to maintain clarity.
                         2. If the information is not present in the context, reply only with: "Not in the provided documentation."
                            Do not add any other information.
                         3. For SQL/Python code, provide an exact copy from the context.
