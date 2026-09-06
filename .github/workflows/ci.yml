@@ -69,6 +69,7 @@ jobs:
           pip install torch==2.6.0+cpu torchvision==0.21.0+cpu torchaudio==2.6.0+cpu --index-url https://download.pytorch.org/whl/cpu
           pip install pytest-cov
           pip install streamlit
+          pip install deep_translator
       - name: Run tests with coverage
         run: python -m pytest tests/ -v --cov=. --cov-fail-under=60
 
