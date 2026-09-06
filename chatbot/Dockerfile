@@ -7,15 +7,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY chatbot/requirements.txt .
 
 
-# Copy and install dependencies 
+# Copy and install dependencies
 # COPY requirements.txt /requirements.txt
 
 RUN pip install --no-cache-dir torch==2.6.0+cpu torchvision==0.21.0+cpu --index-url https://download.pytorch.org/whl/cpu
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r chatbot/requirements.txt
 
 COPY . .
 
