@@ -4,8 +4,10 @@ from ingest_weaviate import batch_iterable, get_embeddings, read_jsonl_file
 class FakeStatus:
     def __init__(self):
         self.calls = []
+
     def progress(self, done, total):
         self.calls.append(("progress", done, total))
+
     def message(self, text):
         self.calls.append(("message", text))
 

@@ -15,7 +15,7 @@ def test_run_mock(monkeypatch, tmp_path):
 
     # Mock embeddings et client
     fake_emb = MagicMock()
-    fake_emb.embed_documents.side_effect = lambda texts: [[0.1]*10 for _ in texts]
+    fake_emb.embed_documents.side_effect = lambda texts: [[0.1] * 10 for _ in texts]
 
     monkeypatch.setattr(ingest_weaviate, "get_embeddings", lambda: fake_emb)
     monkeypatch.setattr(ingest_weaviate, "connect_client", lambda: MagicMock())

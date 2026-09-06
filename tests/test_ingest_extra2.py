@@ -12,9 +12,11 @@ class FakeResponse:
 class FakeData:
     def __init__(self):
         self.inserted = 0
+
     def insert_many(self, objects):
         self.inserted += len(objects)
         return FakeResponse(errors=None)
+
 
 class FakeCollection:
     def __init__(self):
@@ -45,7 +47,7 @@ class FakeClient:
 
 def test_ingest_file_inserts(monkeypatch, tmp_path):
     fake_coll = FakeCollection()
-    emb = type("Emb", (), {"embed_documents": lambda self, texts: [[0.1]*10 for _ in texts]})()
+    emb = type("Emb", (), {"embed_documents": lambda self, texts: [[0.1] * 10 for _ in texts]})()
     monkeypatch.setattr(ingest_weaviate, "get_embeddings", lambda: emb)
 
     chunk_file = tmp_path / "chunks_test.jsonl"

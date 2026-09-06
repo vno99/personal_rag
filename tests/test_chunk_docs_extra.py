@@ -7,8 +7,10 @@ from chunk_docs import chunk_one_record, make_chunk_id, run
 class FakeStatus:
     def __init__(self):
         self.calls = []
+
     def progress(self, done, total):
         self.calls.append(("progress", done, total))
+
     def message(self, text):
         self.calls.append(("message", text))
 
@@ -64,6 +66,9 @@ def test_main_invokes_parser(monkeypatch, tmp_path):
     monkeypatch.setattr(chunk_docs, "RAW_DIR", tmp_path)
     monkeypatch.setattr(chunk_docs, "CHUNKS_DIR", tmp_path)
     import argparse
-    monkeypatch.setattr(argparse.ArgumentParser, "parse_args", lambda self, args=None: argparse.Namespace(source="nonexistent"))
+
+    monkeypatch.setattr(
+        argparse.ArgumentParser, "parse_args", lambda self, args=None: argparse.Namespace(source="nonexistent")
+    )
     # Couverture ligne 137 (run(args.source))
     # On ne fait pas d'assertion stricte, le test sert à couvrir la ligne
