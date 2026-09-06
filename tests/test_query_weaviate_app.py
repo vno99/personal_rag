@@ -1,4 +1,4 @@
-import app.query_weaviate as qw
+import query_weaviate as qw
 
 
 def test_constants():
