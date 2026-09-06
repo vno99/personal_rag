@@ -70,6 +70,7 @@ jobs:
           pip install pytest-cov
           pip install streamlit
           pip install deep_translator
+          pip install langchain-openai
       - name: Run tests with coverage
         run: python -m pytest tests/ -v --cov=. --cov-fail-under=60
 
