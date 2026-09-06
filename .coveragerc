@@ -1,8 +1,4 @@
 [run]
 source = app, chatbot, admin
 omit =
-    admin/app.py
-    chatbot/app.py
-    app/get_docs.py
-    app/query_weaviate.py
     */tests/*
