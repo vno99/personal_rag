@@ -60,6 +60,8 @@ jobs:
 
       - name: Verify docker-compose config
         run: docker-compose config
+
+      - name: Verify docs keywords
         run: |
           grep -q "Snowflake\|Databricks\|Next.js\|TypeScript\|Python" README.md || exit 1
           grep -q "Phase B\|fusion\|admin" CLAUDE.md || exit 1
