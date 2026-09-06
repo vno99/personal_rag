@@ -59,7 +59,7 @@ jobs:
           echo ".env_example and .gitignore present OK"
 
       - name: Verify docker-compose config
-        run: docker-compose config
+        run: docker compose config
 
       - name: Verify docs keywords
         run: |
