@@ -1,5 +1,4 @@
 [run]
-source_pkgs = app, chatbot, admin
-branch = False
-omit =
-    */tests/*
+source = app, chatbot, admin
+omit = */tests/*
+branch = True
