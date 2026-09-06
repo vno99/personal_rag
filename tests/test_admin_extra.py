@@ -16,7 +16,8 @@ def test_unique_run_id_collision():
 
 def test_unique_run_id_no_collision():
     with patch("admin.app.status_path") as mock_path:
-        mock_path.side_effect = MagicMock(exists=lambda: False)
+        # Toujours False : pas de collision
+        mock_path.side_effect = lambda *args, **kwargs: MagicMock(exists=lambda: False)
         result = admin_app.unique_run_id("python")
         assert isinstance(result, str)
         assert len(result) > 0
