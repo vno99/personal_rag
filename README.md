@@ -4,101 +4,47 @@
 [![Streamlit](https://img.shields.io/badge/ui-streamlit-red)](https://streamlit.io/)
 [![Vector DB](https://img.shields.io/badge/database-Weaviate-green)](https://weaviate.io/)
 
-## Présentation
-Ce projet est une application de **RAG (Retrieval-Augmented Generation)** avancée. 
+Application personnelle de **RAG (Retrieval-Augmented Generation)** : indexe des documentations techniques dans **Weaviate** et les rend interrogables via un chatbot **Streamlit** avec recherche hybride (`alpha=0.7`).
 
-Il transforme vos documents statiques en une base de connaissances interactive.  
-Grâce à l'utilisation de la recherche hybride (vectorielle + textuelle), l'assistant ne se contente pas de chercher des mots-clés, il **comprend le contexte** des questions posées.
+## Fonctionnalités
 
-## 🚀 Fonctionnalités Clés
+- **Recherche hybride** (dense `all-mpnet-base-v2` + BM25) fusionnée par collection et triée par `norm_score` (tie-break `vector_score`).
+- **5 collections** indexables : Snowflake, Databricks, Next.js, TypeScript, Python (`app/config/config.py`).
+- **Chatbot multi-collections** (`chatbot/app.py`) avec sélection manuelle dans la sidebar et seuil de pertinence (`MIN_VECTOR_SCORE=0.45`).
+- **Administration pipeline** (`admin/app.py`, Phase B v1) : lancement de runs en sous-processus (`app/runner.py`), suivi temps réel, arrêt, purge, historique borné (`data/status/`).
+- **Tests unitaires** (`tests/test_fusion.py`) pour la logique de fusion pure (`chatbot/fusion.py`).
 
-### 🔍 Recherche Hybride (Hybrid Search)
-Le coeur du système repose sur une recherche combinant :
-*   **Dense Retrieval (Vectoriel) :** Capture la sémantique et le contexte profond grâce aux embeddings.
-*   **Sparse Retrieval (BM25/Keyword) :** Assure la précision sur les mots-clés techniques et les noms propres.
-*   **Paramétrage Alpha :** Utilisation d'un poids `alpha=0.7` pour équilibrer la sémantique et la précision textuelle.
+## Stack
 
-### 🧠 RAG Avancé
-*   **Contextualisation :** Utilisation de LLM pour générer des réponses basées uniquement sur les documents récupérés.
+- **Pipeline** (`app/`) : extraction (`extractors/`), chunking (`chunk_docs.py`), embedding + indexation (`ingest_weaviate.py`), statut (`status_writer.py`).
+- **Chatbot** (`chatbot/`) : Streamlit + `ChatMistralAI` (modèle par défaut `mistral-medium-latest`, surchargeable via `MISTRAL_MODEL`).
+- **DB** : Weaviate 1.31 (`docker-compose.yml`), vecteurs fournis côté client (`DEFAULT_VECTORIZER_MODULE: none`).
 
-### 🛠️ Stack Technique
-*   **Frontend :** [Streamlit](https://streamlit.io/) (Interface utilisateur interactive).
-*   **Vector Database :** [Weaviate](https://weaviate.io/) (Stockage et recherche hybride ultra-rapide).
-*   **LLM :** Génération Mistral (`ChatMistralAI`) — modèle par défaut `mistral-medium-latest`, surchargeable via `MISTRAL_MODEL`.
-*   **Modèle d'Embeddings :** `sentence-transformers/all-mpnet-base-v2`.
+## Commandes essentielles
 
-## 🛠️  Architecture Technique
+```bash
+# Lancer Weaviate
+docker-compose up -d
 
-  Le moteur repose sur le pipeline RAG suivant :
+# Pipeline (une source = 3 étapes)
+python app/get_docs.py --source <snowflake|databricks|nextjs|typescript|python>
+python app/chunk_docs.py --source <source>
+python app/ingest_weaviate.py --source <source>
 
-  1.  **Ingestion** : Chargement et découpage (chunking) des documents.
-  2.  **Embedding** : Transformation du texte en vecteurs numériques.
-  3.  **Stockage** : Indexation dans **Weaviate**.
-  4.  **Retrieval** : Extraction des chunks les plus pertinents via recherche hybride.
-  5.  **Augmentation** : Construction d'un prompt enrichi avec le contexte récupéré.
-  6.  **Génération** : Réponse finale générée par le LLM `Mistral`.
+# Chatbot (développement)
+streamlit run chatbot/app.py
 
-## ⚙️ Installation
+# Administration pipeline
+streamlit run admin/app.py
 
-### Prérequis
-* Python 3.12+
-* Une instance Weaviate (Locale via Docker ou Cloud).
-* Une clé API Mistral.
+# Tests
+python -m pytest
+```
 
-### Étapes
-1. **Cloner le dépôt**
-   ```bash
-   git clone https://github.com/vno99/personal_rag.git
-   cd <votre_dossier>
-   ```
+## Sources
 
-2. **Ingestion des données**
+Définies dans `app/config/config.py` : `sitemap` (Snowflake, Databricks, Next.js), `git` (TypeScript), `archive` (Python 3.14 docs HTML zip).
 
-   #### Extraction
-   Parcours des documents sources pour récupérer le contenu brut. Par défaut, le script extrait les données de la documentation Snowflake via le `sitemap.xml`.
-   > **Note :** Pour modifier la source, mettez à jour les paramètres dans `app/config/config.py`.
-   ```bash
-   python ./app/get_docs.py --source snowflake
-   ```
+## Note
 
-   #### Découpage
-   Une fois les documents récupérés, ils sont découpés en segments plus petits (chunks) optimisés pour la recherche vectorielle et la fenêtre de contexte du LLM.
-   ```bash
-   python ./app/chunk_docs.py --source snowflake
-   ```
-
-   #### Indexation
-   Cette étape transforme les segments de texte en embeddings et les stocke dans la base de données Weaviate.
-   ```bash
-   python ./app/ingest_weaviate.py --source snowflake
-   ```
-
-3. **Lancer Weaviate**
-   ```bash
-   docker-compose up -d --build
-   ```
-
-4. **Déploiement de l'UI**
-
-   #### Construction de l'image
-   ```bash
-   docker build . -t personal_chatbot --no-cache
-   ```
-   #### Lancement du conteneur
-   ```bash
-   docker run \
-   -e PORT=7862 \
-   -e MISTRAL_API_KEY="VOTRE_CLE_MISTRAL" \
-   -p 7862:7862 \
-   personal_chatbot
-   ```
-   
-   #### Accès à l'application
-   Une fois le conteneur démarré, l'interface est accessible à l'adresse suivante :
-   [http://localhost:7862/](http://localhost:7862/)
-
-## 🛠️ Roadmap
-- [ ] Utilisation d'un LLM local type `Ollama`.
-- [ ] Support des fichiers PDF, Markdown, Docx, html, wiki, ... .
-- [ ] Implémentation du Re-ranking (`bge-reranker-large`, `Jina Reranker v2`) pour améliorer la pertinence.
-- [ ] Ajout de citations cliquables vers les sources originales.
+Le projet est découpé en trois mondes indépendants : pipeline (`app/`), chatbot (`chatbot/`), administration (`admin/`). Les collections du pipeline et du chatbot doivent rester synchronisées (`COL_COLLECTIONS` dans `chatbot/app.py`).

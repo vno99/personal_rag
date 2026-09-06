@@ -67,7 +67,7 @@ Le logging est configuré par `app/config/logging.yml` (console + fichier rotati
 
 ### Chatbot — Streamlit (`chatbot/app.py`) + fusion (`chatbot/fusion.py`)
 
-L'interface Streamlit vit dans `app.py` ; la logique de fusion multi-collections est extraite dans `fusion.py` (module **pur**, sans dépendance Streamlit/Weaviate, importé par `app.py`). À chaque question, l'app :
+L'interface Streamlit vit dans `app.py` ; la logique de fusion multi-collections est extraite dans `fusion.py` (module **pur**, sans dépendance Streamlit/Weaviate, importé par `app.py`). `extract_scores.py` parse le `explain_score` de Weaviate en `vector_score` / `keyword_score`. À chaque question, l'app :
 1. **Traduit en anglais si nécessaire** (`langdetect` + `deep_translator` GoogleTranslator), puis embedde la requête.
 2. **Recherche hybride multi-collections** : une requête Weaviate par collection sélectionnée dans la sidebar (`alpha=0.7`, `fusion_type=RELATIVE_SCORE`, `top_k` réglable), puis **fusion min-max** via `fusion.py` (normalisation en [0,1] par collection, tri, tie-break `vector_score`). La pertinence est validée par un seuil `MIN_VECTOR_SCORE=0.45` sur le `vector_score` brut du top-1 fusionné (parsé depuis `explain_score`) : sous le seuil, l'app renvoie un message de repli au lieu d'inventer une réponse.
 3. **Génère** avec `ChatMistralAI` un prompt RAG strict : la réponse doit rester dans le contexte fourni, code SQL/Python copié tel quel. La langue de réponse est sélectionnable (FR/EN/DE/NL) via `LANGUAGES`.
@@ -75,7 +75,7 @@ L'interface Streamlit vit dans `app.py` ; la logique de fusion multi-collections
 Points d'attention :
 - `WEAVIATE_HOST = "host.docker.internal"` et les ports sont **codés en dur** (pas via `config.py`).
 - La liste `COLLECTIONS` (5 entrées : Snowflake, Databricks, Next.js, TypeScript, Python) et le `COLLECTION_NAME` par défaut (utilisé comme repli de `retrieve_context`) doivent **rester synchronisés** avec les collections réellement ingérées par le pipeline.
-- La clé `MISTRAL_API_KEY` vient de la variable d'environnement (voir `chatbot/.env_example`).
+- La clé `MISTRAL_API_KEY` vient de la variable d'environnement (voir `chatbot/.env_example`, avec une valeur sentinelle `aaaaaaaaaaaaaaaaaaa` pour alerter l'utilisateur au démarrage).
 - Les `@st.cache_resource` / `@st.cache_data` cachent respectivement le modèle d'embedding (mémoire) et les traductions (1h).
 
 ### Administration (`admin/app.py`, `app/runner.py`, `app/status_writer.py`)
