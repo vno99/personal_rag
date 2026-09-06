@@ -33,7 +33,7 @@ jobs:
         run: ruff format --check .
 
       - name: Type check
-        run: mypy --exclude admin/app.py app/ chatbot/ tests/
+        run: mypy app/ chatbot/ tests/
 
       - name: Run tests with coverage
         run: python -m pytest tests/ -v --cov=.
