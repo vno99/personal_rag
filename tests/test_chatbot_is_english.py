@@ -1,9 +1,10 @@
 """Tests de base pour is_english (réplique locale, sans dépendance chatbot/app.py)."""
+
 import pytest
 
 pytest.importorskip("langdetect", reason="langdetect non disponible en CI")
 
-from langdetect import detect, LangDetectException
+from langdetect import LangDetectException, detect
 
 
 def is_english(text):

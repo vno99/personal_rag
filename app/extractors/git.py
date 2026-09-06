@@ -2,7 +2,8 @@ import subprocess
 from pathlib import Path
 from urllib.parse import urlparse
 
-import config.config as config
+from config import config
+
 from extractors.base import BaseExtractor
 
 
@@ -41,12 +42,12 @@ class GitExtractor(BaseExtractor):
             # Fast-forward (ou création) de la branche locale depuis le remote.
             subprocess.run(
                 ["git", "fetch", "origin", f"{self.branch}:{self.branch}"],
-                cwd=self.cache_dir, check=True,
+                cwd=self.cache_dir,
+                check=True,
             )
         else:
             subprocess.run(
-                ["git", "clone", "--depth", "1", "--branch", self.branch,
-                 self.repo_url, str(self.cache_dir)],
+                ["git", "clone", "--depth", "1", "--branch", self.branch, self.repo_url, str(self.cache_dir)],
                 check=True,
             )
         return self.cache_dir

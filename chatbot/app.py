@@ -3,14 +3,13 @@ import os
 import streamlit as st
 import torch
 import weaviate
+from deep_translator import GoogleTranslator
+from extract_scores import extract_scores
+from fusion import fuse, is_in_scope
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_mistralai import ChatMistralAI
 from langdetect import detect
 from weaviate.classes.query import HybridFusion, MetadataQuery
-from deep_translator import GoogleTranslator
-
-from extract_scores import extract_scores
-from fusion import fuse, is_in_scope
 
 WEAVIATE_HOST = os.getenv("WEAVIATE_HOST", "host.docker.internal")
 WEAVIATE_PORT = int(os.getenv("WEAVIATE_PORT", "9090"))
@@ -34,26 +33,11 @@ MAX_TOKEN = 1500
 LLM_MODEL = os.getenv("MISTRAL_MODEL", "mistral-medium-latest")
 
 COLLECTIONS = [
-    {
-        "name": "SnowflakeDocs",
-        "description": "Snowflake documentation : https://docs.snowflake.com"
-    },
-    {
-        "name": "DatabricksDocs",
-        "description": "Databricks documentation : https://docs.databricks.com/en"
-    },
-    {
-        "name": "NextJSDocs",
-        "description": "Next.js documentation : https://nextjs.org/docs"
-    },
-    {
-        "name": "TypeScriptDocs",
-        "description": "TypeScript documentation : https://www.typescriptlang.org/docs"
-    },
-    {
-        "name": "PythonDocs",
-        "description": "Python documentation : https://docs.python.org/3"
-    },
+    {"name": "SnowflakeDocs", "description": "Snowflake documentation : https://docs.snowflake.com"},
+    {"name": "DatabricksDocs", "description": "Databricks documentation : https://docs.databricks.com/en"},
+    {"name": "NextJSDocs", "description": "Next.js documentation : https://nextjs.org/docs"},
+    {"name": "TypeScriptDocs", "description": "TypeScript documentation : https://www.typescriptlang.org/docs"},
+    {"name": "PythonDocs", "description": "Python documentation : https://docs.python.org/3"},
 ]
 COL_NAME_LIST = [col["name"] for col in COLLECTIONS]
 
@@ -63,7 +47,7 @@ FALLBACK_MESSAGES = {
     "Anglais": "I cannot answer this question with the available context. This application is limited to the indexed documentation.",
     "Allemand": "Ich kann diese Frage mit dem verfügbaren Kontext nicht beantworten. Diese Anwendung ist auf die indizierte Dokumentation beschränkt.",
     "Français": "Je ne peux pas répondre à cette question avec le contexte disponible. Cette application est limitée à la documentation indexée.",
-    "Néerlandais": "Ik kan deze vraag niet beantwoorden met de beschikbare context. Deze applicatie is beperkt tot de geïndexeerde documentatie."
+    "Néerlandais": "Ik kan deze vraag niet beantwoorden met de beschikbare context. Deze applicatie is beperkt tot de geïndexeerde documentatie.",
 }
 
 
@@ -82,30 +66,27 @@ def get_embeddings():
         encode_kwargs={"normalize_embeddings": NORMALIZE_EMBEDDINGS},
     )
 
+
 embeddings = get_embeddings()
+
 
 @st.cache_resource
 def connect_client():
     """Singleton Weaviate client (évite la reconnexion par tour)."""
-    return weaviate.connect_to_local(
-        host=WEAVIATE_HOST,
-        port=WEAVIATE_PORT,
-        grpc_port=WEAVIATE_GRPC_PORT
-    )
+    return weaviate.connect_to_local(host=WEAVIATE_HOST, port=WEAVIATE_PORT, grpc_port=WEAVIATE_GRPC_PORT)
 
 
 def is_english(text):
     """Checks if the provided text is in English. Protects against
     `LangDetectException` (empty text, too short)."""
     try:
-        return detect(text) == 'en'
+        return detect(text) == "en"
     except Exception:
         return False
 
 
 # Protects against prompt injection via indexed chunks.
-_INJECTION_TAGS = ["<|instructions|>", "<|end|>", "<|role|>", "<|system|>",
-                    "<|user|>", "<|assistant|>"]
+_INJECTION_TAGS = ["<|instructions|>", "<|end|>", "<|role|>", "<|system|>", "<|user|>", "<|assistant|>"]
 
 
 def _escape_context(context: str) -> str:
@@ -126,7 +107,7 @@ def translate_to_english(text):
         str: The translated text in English.
     """
     try:
-        return GoogleTranslator(source='auto', target='en').translate(text)
+        return GoogleTranslator(source="auto", target="en").translate(text)
     except Exception:
         # Fallback : retourne le texte original si la traduction échoue
         # (défaut réseau, service indisponible, etc.).
@@ -152,15 +133,17 @@ def query_one_collection(client, collection_name, query_text_en, query_vector, t
         explain_score = obj.metadata.explain_score or ""
         vector_score, keyword_score = extract_scores(explain_score)
 
-        results.append({
-            "collection": collection_name,
-            "content": props.get("content", ""),
-            "source": props.get("source", "N/A"),
-            "hybrid_score": float(obj.metadata.score) if obj.metadata.score is not None else 0.0,
-            "vector_score": vector_score,
-            "keyword_score": keyword_score,
-            "explain_score": explain_score,
-        })
+        results.append(
+            {
+                "collection": collection_name,
+                "content": props.get("content", ""),
+                "source": props.get("source", "N/A"),
+                "hybrid_score": float(obj.metadata.score) if obj.metadata.score is not None else 0.0,
+                "vector_score": vector_score,
+                "keyword_score": keyword_score,
+                "explain_score": explain_score,
+            }
+        )
 
     return results
 
@@ -199,8 +182,7 @@ def retrieve_context(query_text, top_k=TOP_K, collections=None):
         }
 
     results_by_collection = [
-        query_one_collection(client, name, query_text_en, query_vector, top_k)
-        for name in existing
+        query_one_collection(client, name, query_text_en, query_vector, top_k) for name in existing
     ]
 
     fused = fuse(results_by_collection, top_k=top_k)
@@ -237,17 +219,10 @@ def retrieve_context(query_text, top_k=TOP_K, collections=None):
 
 
 def main():
-    st.set_page_config(
-        page_title="Personal RAG", 
-        page_icon="",
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
-    
+    st.set_page_config(page_title="Personal RAG", page_icon="", layout="wide", initial_sidebar_state="expanded")
 
     st.title("Personal RAG")
     st.markdown("**Interrogation de la doc indexée**")
-
 
     with st.sidebar:
         with st.container(border=True):
@@ -260,17 +235,12 @@ def main():
                 help="Sélectionnez une ou plusieurs collections. Par défaut : toutes.",
             )
 
-            top_k_slider = st.slider(
-                "Top sources",
-                min_value=1,
-                max_value=10,
-                value=TOP_K
-            )
+            top_k_slider = st.slider("Top sources", min_value=1, max_value=10, value=TOP_K)
 
             selected_language = st.selectbox(
                 "Langue de la réponse",
                 LANGUAGES,
-                index=2 # Français
+                index=2,  # Français
             )
 
         if not MISTRAL_API_KEY or MISTRAL_API_KEY == _MISTRAL_SENTINEL:
@@ -284,7 +254,6 @@ def main():
             st.session_state.messages = []
             st.rerun()
 
-
     # Chat history
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -295,10 +264,10 @@ def main():
             st.markdown(message["content"])
 
             # Show sources if available
-            if "sources" in message and message["sources"]:
+            if message.get("sources"):
                 with st.expander("📚 Sources"):
                     for idx, src in enumerate(message["sources"]):
-                        st.markdown(f"**#{idx+1}** [{src}]({src})")
+                        st.markdown(f"**#{idx + 1}** [{src}]({src})")
 
     # Accept user input
     if prompt := st.chat_input("Pose ta question ...", key="chat_input"):
@@ -308,7 +277,7 @@ def main():
         st.session_state.messages = st.session_state.messages[-20:]
         with st.chat_message("user"):
             st.markdown(prompt)
-        
+
         # Display assistant response in chat message container
         with st.chat_message("assistant"):
             with st.spinner("🔍 Retrieval + MistralAI..."):
@@ -362,11 +331,7 @@ def main():
                             full_response = response.content
 
                             # Add assistant response to chat history
-                            message = {
-                                "role": "assistant",
-                                "content": full_response,
-                                "sources": result["sources"]
-                            }
+                            message = {"role": "assistant", "content": full_response, "sources": result["sources"]}
                             st.session_state.messages.append(message)
                             # Cap mémoire après chaque ajout (cf. 6e vague).
                             st.session_state.messages = st.session_state.messages[-20:]
@@ -375,18 +340,19 @@ def main():
                             st.markdown(full_response)
 
                             # Show sources if available
-                            if "sources" in message and message["sources"]:
+                            if message.get("sources"):
                                 with st.expander("📚 Sources"):
                                     for i, src in enumerate(message["sources"]):
-                                        st.markdown(f"**#{i+1}** [{src}]({src})")
+                                        st.markdown(f"**#{i + 1}** [{src}]({src})")
 
                 except Exception as e:
                     full_response = f"⚠️ Erreur : {e}"
                     st.session_state.messages.append({"role": "assistant", "content": full_response})
                     st.error(full_response)
-                
 
     st.markdown("---")
     st.markdown("")
+
+
 if __name__ == "__main__":
     main()

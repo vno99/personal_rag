@@ -1,7 +1,7 @@
 import json
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from config.config import docs_pattern
 

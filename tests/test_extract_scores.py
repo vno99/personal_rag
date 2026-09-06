@@ -7,10 +7,9 @@ multi-collections dégrade (cf. code review #1 et #4). Ce test verrouille le
 contrat de surface pour qu'un changement soit détecté par la CI plutôt qu'en
 production.
 """
+
 import pytest
-
 from extract_scores import extract_scores
-
 
 # --- Contrat de base --------------------------------------------------------
 
@@ -30,13 +29,9 @@ def test_unrelated_text_returns_none_tuple():
 # --- Cas conforme au format Weaviate observé --------------------------------
 
 VECTOR_LINE = (
-    "Result Set vector, hybridVector: "
-    "Property \"content\" (0.85), Property \"chunk_id\" (0.0) original score 0.789"
+    'Result Set vector, hybridVector: Property "content" (0.85), Property "chunk_id" (0.0) original score 0.789'
 )
-KEYWORD_LINE = (
-    "Result Set keyword, bm25: "
-    "Property \"content\" (1.20), Property \"chunk_id\" (0.0) original score 0.345"
-)
+KEYWORD_LINE = 'Result Set keyword, bm25: Property "content" (1.20), Property "chunk_id" (0.0) original score 0.345'
 
 
 def test_vector_and_keyword_extracted():

@@ -1,5 +1,4 @@
 from bs4 import BeautifulSoup
-
 from extractors.html_content import extract_from_soup
 
 

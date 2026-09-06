@@ -4,6 +4,7 @@ Lance les runs d'ingestion en sous-processus (app/runner.py), affiche leur
 statut temps réel (data/status/*.json), permet de les arrêter, purge une
 collection Weaviate et garde un historique borné.
 """
+
 import os
 import subprocess
 import sys
@@ -16,10 +17,16 @@ ROOT = Path(__file__).resolve().parents[1]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT / "app"))
 
-import config.config as config  # noqa: E402
-from status_writer import (  # noqa: E402
-    create_run_file, list_runs, mark_cancelled, mark_done, mark_failed,
-    read_run, run_id_from_now, status_path,
+from config import config
+from status_writer import (
+    create_run_file,
+    list_runs,
+    mark_cancelled,
+    mark_done,
+    mark_failed,
+    read_run,
+    run_id_from_now,
+    status_path,
 )
 
 STATUS_DIR = Path(config.STATUS_DIR)
@@ -67,8 +74,10 @@ def weaviate_ready() -> bool:
 @st.cache_resource
 def connect_client():
     import weaviate
+
     return weaviate.connect_to_local(
-        host=config.WEAVIATE_HOST, port=config.WEAVIATE_PORT,
+        host=config.WEAVIATE_HOST,
+        port=config.WEAVIATE_PORT,
         grpc_port=config.WEAVIATE_GRPC_PORT,
     )
 
@@ -85,8 +94,7 @@ def collection_counts() -> dict[str, int | None]:
         name = src["collection"]
         try:
             if name in existing:
-                counts[src["name"]] = client.collections.get(name).aggregate.over_all(
-                    total_count=True).total_count
+                counts[src["name"]] = client.collections.get(name).aggregate.over_all(total_count=True).total_count
             else:
                 counts[src["name"]] = None
         except Exception:
@@ -99,9 +107,16 @@ def launch_ingest(source: str, label: str) -> None:
     run_id = unique_run_id(source)
     path = status_path(STATUS_DIR, run_id, source)
     cmd = [
-        sys.executable, "app/runner.py",
-        "--source", source, "--run-id", run_id,
-        "--operation", "ingest", "--start-step", start_step,
+        sys.executable,
+        "app/runner.py",
+        "--source",
+        source,
+        "--run-id",
+        run_id,
+        "--operation",
+        "ingest",
+        "--start-step",
+        start_step,
     ]
     STATUS_DIR.mkdir(parents=True, exist_ok=True)
     # stderr est capturé dans un fichier log consultable depuis l'UI :
@@ -111,21 +126,34 @@ def launch_ingest(source: str, label: str) -> None:
     stderr_file = stderr_path.open("w", encoding="utf-8")
     try:
         proc = subprocess.Popen(
-            cmd, cwd=ROOT, stdout=subprocess.DEVNULL, stderr=stderr_file,
+            cmd,
+            cwd=ROOT,
+            stdout=subprocess.DEVNULL,
+            stderr=stderr_file,
         )
     except Exception as exc:  # ex. python introuvable
         stderr_file.close()
-        create_run_file(path, run_id=run_id, source=source, operation="ingest",
-                        start_step=start_step,
-                        steps=[start_step], status_dir=STATUS_DIR)
+        create_run_file(
+            path,
+            run_id=run_id,
+            source=source,
+            operation="ingest",
+            start_step=start_step,
+            steps=[start_step],
+            status_dir=STATUS_DIR,
+        )
         mark_failed(path, f"impossible de lancer le runner: {exc}")
         # On NE peuplE PAS `st.session_state["active"]` : le run est déjà
         # terminal (failed), l'UI doit afficher son message d'erreur dans
         # l'historique, pas se mettre en mode "run actif" (cf. code review B).
         return
-    st.session_state["active"] = {"run_id": run_id, "source": source,
-                                  "label": label, "path": str(path),
-                                  "stderr_path": str(stderr_path)}
+    st.session_state["active"] = {
+        "run_id": run_id,
+        "source": source,
+        "label": label,
+        "path": str(path),
+        "stderr_path": str(stderr_path),
+    }
     st.session_state["proc"] = proc
     # Le fd stderr reste ouvert tant que le runner tourne (Popen écrit
     # dessus) ; il sera fermé au nettoyage du statut terminal (cf. 4e vague).
@@ -137,8 +165,15 @@ def purge_collection(source: str) -> None:
     run_id = unique_run_id(source)
     path = status_path(STATUS_DIR, run_id, source)
     STATUS_DIR.mkdir(parents=True, exist_ok=True)
-    create_run_file(path, run_id=run_id, source=source, operation="purge",
-                    start_step="purge", steps=["purge"], status_dir=STATUS_DIR)
+    create_run_file(
+        path,
+        run_id=run_id,
+        source=source,
+        operation="purge",
+        start_step="purge",
+        steps=["purge"],
+        status_dir=STATUS_DIR,
+    )
     try:
         client = connect_client()
         existing = set(client.collections.list_all())
@@ -203,8 +238,7 @@ def render_history() -> None:
         if not isinstance(r, dict) or not r.get("run_id"):
             continue
         status = r.get("status", "?")
-        emoji = {"done": "✅", "failed": "❌", "running": "🔄",
-                 "cancelled": "⏹️"}.get(status, "❔")
+        emoji = {"done": "✅", "failed": "❌", "running": "🔄", "cancelled": "⏹️"}.get(status, "❔")
         run_id = r.get("run_id", "?")
         source = r.get("source", "?")
         operation = r.get("operation", "?")
@@ -218,8 +252,10 @@ def main() -> None:
 
     ok = weaviate_ready()
     if not ok:
-        st.warning(f"Weaviate injoignable sur {config.WEAVIATE_HOST}:{config.WEAVIATE_PORT} — "
-                   "les collections affichées seront vides (les runs restent possibles).")
+        st.warning(
+            f"Weaviate injoignable sur {config.WEAVIATE_HOST}:{config.WEAVIATE_PORT} — "
+            "les collections affichées seront vides (les runs restent possibles)."
+        )
 
     counts = collection_counts()
 
@@ -252,8 +288,7 @@ def main() -> None:
 
         running = active_running_state()
         if running:
-            st.warning("Un run est déjà en cours — lancement et purge désactivés "
-                       "jusqu'à son terme.")
+            st.warning("Un run est déjà en cours — lancement et purge désactivés jusqu'à son terme.")
 
         col1, col2 = st.columns(2)
         if col1.button("Lancer", type="primary", use_container_width=True, disabled=running):
@@ -322,9 +357,15 @@ def main() -> None:
                     pass
             STATUS_DIR.mkdir(parents=True, exist_ok=True)
             start_step = START_STEPS.get(entry["label"])
-            create_run_file(path, run_id=entry["run_id"], source=entry["source"],
-                            operation="ingest", start_step=start_step,
-                            steps=[start_step] if start_step else [], status_dir=STATUS_DIR)
+            create_run_file(
+                path,
+                run_id=entry["run_id"],
+                source=entry["source"],
+                operation="ingest",
+                start_step=start_step,
+                steps=[start_step] if start_step else [],
+                status_dir=STATUS_DIR,
+            )
             mark_failed(path, "le runner s'est arrêté avant de créer le fichier de statut")
             st.session_state.pop("active", None)
             st.session_state.pop("proc", None)

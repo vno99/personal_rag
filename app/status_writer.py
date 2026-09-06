@@ -4,12 +4,13 @@
 pointeur latest.json. Utilisé par le runner (sous-processus) et l'app
 d'administration (UI + purge).
 """
+
 import json
 import os
 from datetime import datetime
 from pathlib import Path
 
-import config.config as config
+from config import config
 
 
 def _now_iso() -> str:
@@ -42,8 +43,7 @@ def _atomic_write(path: Path, data: dict) -> None:
     os.replace(tmp, path)
 
 
-def create_run_file(path, *, run_id, source, operation, start_step, steps,
-                    pid=None, status_dir=None) -> dict:
+def create_run_file(path, *, run_id, source, operation, start_step, steps, pid=None, status_dir=None) -> dict:
     path = Path(path)
     now = _now_iso()
     record = {
@@ -106,8 +106,7 @@ def mark_cancelled(path, last_message: str = "annulé") -> dict:
     au moment de l'arrêt") pour préserver la progression visible dans l'UI
     au lieu du libellé générique "annulé".
     """
-    rec = update_run_file(path, status="cancelled", finished_at=_now_iso(),
-                          error=None, last_message=last_message)
+    rec = update_run_file(path, status="cancelled", finished_at=_now_iso(), error=None, last_message=last_message)
     _refresh_latest(path)
     return rec
 
@@ -115,8 +114,7 @@ def mark_cancelled(path, last_message: str = "annulé") -> dict:
 def _set_latest(status_dir, path: Path) -> None:
     info = read_run(path) or {}
     latest_path = Path(status_dir) / "latest.json"
-    _atomic_write(latest_path, {"file": path.name, "run_id": info.get("run_id"),
-                                "updated_at": _now_iso()})
+    _atomic_write(latest_path, {"file": path.name, "run_id": info.get("run_id"), "updated_at": _now_iso()})
 
 
 def latest_run(status_dir) -> dict | None:

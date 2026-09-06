@@ -3,8 +3,8 @@ import json
 import uuid
 from pathlib import Path
 
-import config.config as config
 import weaviate
+from config import config
 from config.logger_config import setup_logging
 from langchain_huggingface import HuggingFaceEmbeddings
 from weaviate.classes.config import Configure, DataType, Property
@@ -98,10 +98,10 @@ def get_collection(client, collection_name: str):
 def read_jsonl_file(file_path: Path):
     """
     Generator function that reads a JSONL file and yields JSON objects line by line.
-    
+
     Args:
         file_path (Path): Path to the JSONL file to read.
-        
+
     Yields:
         dict: Parsed JSON object from each line of the file.
     """
@@ -181,7 +181,7 @@ def ingest_file(weaviate_collection, embeddings, file_path: Path, progress=None)
                 failed += 1
                 logger.info(f"chunk_id manquant dans {file_path.name}")
                 continue
-            
+
             # Create a DataObject for Weaviate
             obj = DataObject(
                 uuid=str(uuid.uuid3(uuid.NAMESPACE_DNS, chunk_id)),
@@ -194,7 +194,7 @@ def ingest_file(weaviate_collection, embeddings, file_path: Path, progress=None)
                     "chunk_size": record.get("chunk_size"),
                     "content": record.get("content"),
                 },
-                vector=vector
+                vector=vector,
             )
 
             objects_to_insert.append(obj)
@@ -229,8 +229,7 @@ def run(source_name: str, status=None) -> None:
     if not input_files:
         logger.info(f"Aucun fichier {chunks_pattern}*.{config.JSONL_EXT} trouvé dans {CHUNKS_DATA_DIR}")
         if status is not None:
-            raise RuntimeError(
-                f"aucun fichier {chunks_pattern}*.{config.JSONL_EXT} pour la source '{source_name}'")
+            raise RuntimeError(f"aucun fichier {chunks_pattern}*.{config.JSONL_EXT} pour la source '{source_name}'")
         return
 
     logger.info(f"{len(input_files)} fichiers trouvés dans {CHUNKS_DATA_DIR}")

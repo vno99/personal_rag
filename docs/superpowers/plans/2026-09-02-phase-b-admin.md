@@ -50,8 +50,16 @@ import json
 from pathlib import Path
 
 from status_writer import (
-    create_run_file, latest_run, list_runs, mark_cancelled, mark_done,
-    mark_failed, prune_history, read_run, run_id_from_now, status_path,
+    create_run_file,
+    latest_run,
+    list_runs,
+    mark_cancelled,
+    mark_done,
+    mark_failed,
+    prune_history,
+    read_run,
+    run_id_from_now,
+    status_path,
     update_run_file,
 )
 
@@ -63,9 +71,16 @@ def test_run_id_from_now_has_no_colons():
 
 def test_create_and_read(tmp_path):
     path = status_path(tmp_path, "2026-09-02T16-20-05", "python")
-    create_run_file(path, run_id="2026-09-02T16-20-05", source="python", operation="ingest",
-                    start_step="chunk_docs", steps=["chunk_docs", "ingest_weaviate"],
-                    pid=123, status_dir=tmp_path)
+    create_run_file(
+        path,
+        run_id="2026-09-02T16-20-05",
+        source="python",
+        operation="ingest",
+        start_step="chunk_docs",
+        steps=["chunk_docs", "ingest_weaviate"],
+        pid=123,
+        status_dir=tmp_path,
+    )
     rec = read_run(path)
     assert rec["status"] == "running"
     assert rec["source"] == "python"
@@ -76,15 +91,21 @@ def test_create_and_read(tmp_path):
 
 def test_atomic_write_leaves_no_tmp(tmp_path):
     path = status_path(tmp_path, "r1", "python")
-    create_run_file(path, run_id="r1", source="python", operation="ingest",
-                    start_step="get_docs", steps=["get_docs"])
+    create_run_file(path, run_id="r1", source="python", operation="ingest", start_step="get_docs", steps=["get_docs"])
     assert not list(tmp_path.glob("*.tmp"))
 
 
 def test_transitions(tmp_path):
     path = status_path(tmp_path, "r1", "python")
-    create_run_file(path, run_id="r1", source="python", operation="ingest",
-                    start_step="get_docs", steps=["get_docs"], status_dir=tmp_path)
+    create_run_file(
+        path,
+        run_id="r1",
+        source="python",
+        operation="ingest",
+        start_step="get_docs",
+        steps=["get_docs"],
+        status_dir=tmp_path,
+    )
     mark_done(path)
     rec = read_run(path)
     assert rec["status"] == "done" and rec["finished_at"] is not None
@@ -98,8 +119,15 @@ def test_transitions(tmp_path):
 
 def test_update_progress_and_step(tmp_path):
     path = status_path(tmp_path, "r1", "python")
-    create_run_file(path, run_id="r1", source="python", operation="ingest",
-                    start_step="chunk_docs", steps=["chunk_docs"], status_dir=tmp_path)
+    create_run_file(
+        path,
+        run_id="r1",
+        source="python",
+        operation="ingest",
+        start_step="chunk_docs",
+        steps=["chunk_docs"],
+        status_dir=tmp_path,
+    )
     update_run_file(path, step="chunk_docs", step_progress={"done": 2, "total": 5})
     rec = read_run(path)
     assert rec["step"] == "chunk_docs"
@@ -108,12 +136,17 @@ def test_update_progress_and_step(tmp_path):
 
 def test_latest_and_prune(tmp_path):
     for rid in ["2026-09-02T16-00-00", "2026-09-02T17-00-00", "2026-09-02T18-00-00"]:
-        create_run_file(status_path(tmp_path, rid, "python"), run_id=rid, source="python",
-                        operation="ingest", start_step="get_docs", steps=["get_docs"],
-                        status_dir=tmp_path)
+        create_run_file(
+            status_path(tmp_path, rid, "python"),
+            run_id=rid,
+            source="python",
+            operation="ingest",
+            start_step="get_docs",
+            steps=["get_docs"],
+            status_dir=tmp_path,
+        )
     runs = list_runs(tmp_path)
-    assert [r["run_id"] for r in runs] == [
-        "2026-09-02T18-00-00", "2026-09-02T17-00-00", "2026-09-02T16-00-00"]
+    assert [r["run_id"] for r in runs] == ["2026-09-02T18-00-00", "2026-09-02T17-00-00", "2026-09-02T16-00-00"]
     assert latest_run(tmp_path)["run_id"] == "2026-09-02T18-00-00"
     prune_history(tmp_path, keep=2)
     left = sorted(p.name for p in tmp_path.glob("*.json") if p.name != "latest.json")
@@ -156,6 +189,7 @@ Créer `app/status_writer.py` :
 pointeur latest.json. Utilisé par le runner (sous-processus) et l'app
 d'administration (UI + purge).
 """
+
 import json
 import os
 from datetime import datetime
@@ -194,8 +228,7 @@ def _atomic_write(path: Path, data: dict) -> None:
     os.replace(tmp, path)
 
 
-def create_run_file(path, *, run_id, source, operation, start_step, steps,
-                    pid=None, status_dir=None) -> dict:
+def create_run_file(path, *, run_id, source, operation, start_step, steps, pid=None, status_dir=None) -> dict:
     path = Path(path)
     now = _now_iso()
     record = {
@@ -241,15 +274,13 @@ def mark_failed(path, error) -> dict:
 
 
 def mark_cancelled(path) -> dict:
-    return update_run_file(path, status="cancelled", finished_at=_now_iso(),
-                           error=None, last_message="annulé")
+    return update_run_file(path, status="cancelled", finished_at=_now_iso(), error=None, last_message="annulé")
 
 
 def _set_latest(status_dir, path: Path) -> None:
     info = read_run(path) or {}
     latest_path = Path(status_dir) / "latest.json"
-    _atomic_write(latest_path, {"file": path.name, "run_id": info.get("run_id"),
-                                "updated_at": _now_iso()})
+    _atomic_write(latest_path, {"file": path.name, "run_id": info.get("run_id"), "updated_at": _now_iso()})
 
 
 def latest_run(status_dir) -> dict | None:
@@ -336,9 +367,11 @@ def test_archive_extractor_reports_progress(tmp_path, monkeypatch):
 
     monkeypatch.setattr("urllib.request.urlretrieve", fake_urlretrieve)
     source = {
-        "name": "python", "type": "archive",
+        "name": "python",
+        "type": "archive",
         "archive_url": f"https://docs.python.org/3.14/archives/{archive.name}",
-        "collection": "PythonDocs", "content_selector": "[role='main']",
+        "collection": "PythonDocs",
+        "content_selector": "[role='main']",
     }
     calls = []
     extractor = ArchiveExtractor(source, tmp_path / "raw", batch_size=500, cache_dir=tmp_path / "src")
@@ -362,10 +395,12 @@ def test_sitemap_extractor_reports_progress(tmp_path):
         return FakeLoader(docs)
 
     source = {
-        "name": "nextjs", "type": "sitemap",
+        "name": "nextjs",
+        "type": "sitemap",
         "sitemap_url": "https://nextjs.org/sitemap.xml",
         "filter_urls": [r"https://nextjs\.org/docs/.*"],
-        "collection": "NextJSDocs", "content_selector": "article",
+        "collection": "NextJSDocs",
+        "content_selector": "article",
     }
     calls = []
     extractor = SitemapExtractor(source, tmp_path, batch_size=500, loader_factory=loader_factory)
@@ -817,12 +852,18 @@ def test_execute_run_success_writes_done(tmp_path):
         def run(source, status):
             calls.append(step)
             status.progress(1, 1)
+
         return run
 
-    funcs = {"get_docs": make("get_docs"), "chunk_docs": make("chunk_docs"),
-             "ingest_weaviate": make("ingest_weaviate")}
-    execute_run(run_id="2026-09-02T10-00-00", source="python", operation="ingest",
-                start_step="chunk_docs", status_dir=tmp_path, run_funcs=funcs)
+    funcs = {"get_docs": make("get_docs"), "chunk_docs": make("chunk_docs"), "ingest_weaviate": make("ingest_weaviate")}
+    execute_run(
+        run_id="2026-09-02T10-00-00",
+        source="python",
+        operation="ingest",
+        start_step="chunk_docs",
+        status_dir=tmp_path,
+        run_funcs=funcs,
+    )
     assert calls == ["chunk_docs", "ingest_weaviate"]
     rec = read_run(status_path(tmp_path, "2026-09-02T10-00-00", "python"))
     assert rec["status"] == "done"
@@ -834,11 +875,16 @@ def test_execute_run_failure_marks_failed_and_stops(tmp_path):
     def boom(source, status):
         raise RuntimeError("explose")
 
-    funcs = {"get_docs": boom, "chunk_docs": lambda s, st: None,
-             "ingest_weaviate": lambda s, st: None}
+    funcs = {"get_docs": boom, "chunk_docs": lambda s, st: None, "ingest_weaviate": lambda s, st: None}
     with pytest.raises(RuntimeError):
-        execute_run(run_id="2026-09-02T10-00-01", source="python", operation="ingest",
-                    start_step="get_docs", status_dir=tmp_path, run_funcs=funcs)
+        execute_run(
+            run_id="2026-09-02T10-00-01",
+            source="python",
+            operation="ingest",
+            start_step="get_docs",
+            status_dir=tmp_path,
+            run_funcs=funcs,
+        )
     rec = read_run(status_path(tmp_path, "2026-09-02T10-00-01", "python"))
     assert rec["status"] == "failed"
     assert "explose" in rec["error"]
@@ -858,6 +904,7 @@ Lancé en sous-processus par l'app d'administration. Un run = un process :
 il exécute séquentiellement les run() des étapes demandées (une source),
 en écrivant sa progression dans data/status/{run_id}_{source}.json.
 """
+
 import argparse
 import os
 import sys
@@ -884,8 +931,16 @@ def execute_run(*, run_id, source, operation, start_step, status_dir, run_funcs)
     """Exécute un run complet. Soulève en cas d'échec (après marquage failed)."""
     steps = compute_steps(operation, start_step)
     path = status_path(status_dir, run_id, source)
-    create_run_file(path, run_id=run_id, source=source, operation=operation,
-                    start_step=start_step, steps=steps, pid=os.getpid(), status_dir=status_dir)
+    create_run_file(
+        path,
+        run_id=run_id,
+        source=source,
+        operation=operation,
+        start_step=start_step,
+        steps=steps,
+        pid=os.getpid(),
+        status_dir=status_dir,
+    )
     reporter = RunReporter(path)
     try:
         for step in steps:
@@ -901,22 +956,26 @@ def _real_run_funcs():
     from get_docs import run as run_get_docs
     from chunk_docs import run as run_chunk
     from ingest_weaviate import run as run_ingest
+
     return {"get_docs": run_get_docs, "chunk_docs": run_chunk, "ingest_weaviate": run_ingest}
 
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Exécute un run d'ingestion pour une source.")
-    parser.add_argument("--source", required=True, choices=[s["name"] for s in config.SOURCES],
-                        help="Source à ingérer")
-    parser.add_argument("--run-id", required=True,
-                        help="Identifiant du run, ex. 2026-09-02T16-20-05")
+    parser.add_argument("--source", required=True, choices=[s["name"] for s in config.SOURCES], help="Source à ingérer")
+    parser.add_argument("--run-id", required=True, help="Identifiant du run, ex. 2026-09-02T16-20-05")
     parser.add_argument("--operation", default="ingest", choices=["ingest"])
     parser.add_argument("--start-step", default="get_docs", choices=FULL_STEPS)
     args = parser.parse_args(argv)
     try:
-        execute_run(run_id=args.run_id, source=args.source, operation=args.operation,
-                    start_step=args.start_step, status_dir=Path(config.STATUS_DIR),
-                    run_funcs=_real_run_funcs())
+        execute_run(
+            run_id=args.run_id,
+            source=args.source,
+            operation=args.operation,
+            start_step=args.start_step,
+            status_dir=Path(config.STATUS_DIR),
+            run_funcs=_real_run_funcs(),
+        )
     except Exception:
         return 1
     return 0
@@ -999,6 +1058,7 @@ Lance les runs d'ingestion en sous-processus (app/runner.py), affiche leur
 statut temps réel (data/status/*.json), permet de les arrêter, purge une
 collection Weaviate et garde un historique borné.
 """
+
 import os
 import subprocess
 import sys
@@ -1013,8 +1073,15 @@ sys.path.insert(0, str(ROOT / "app"))
 
 import config.config as config  # noqa: E402
 from status_writer import (  # noqa: E402
-    create_run_file, list_runs, mark_cancelled, mark_done, mark_failed,
-    read_run, run_id_from_now, status_path, update_run_file,
+    create_run_file,
+    list_runs,
+    mark_cancelled,
+    mark_done,
+    mark_failed,
+    read_run,
+    run_id_from_now,
+    status_path,
+    update_run_file,
 )
 
 STATUS_DIR = Path(config.STATUS_DIR)
@@ -1040,8 +1107,10 @@ def weaviate_ready() -> bool:
 @st.cache_resource
 def connect_client():
     import weaviate
+
     return weaviate.connect_to_local(
-        host=config.WEAVIATE_HOST, port=config.WEAVIATE_PORT,
+        host=config.WEAVIATE_HOST,
+        port=config.WEAVIATE_PORT,
         grpc_port=config.WEAVIATE_GRPC_PORT,
     )
 
@@ -1058,8 +1127,7 @@ def collection_counts() -> dict[str, int | None]:
         name = src["collection"]
         try:
             if name in existing:
-                counts[src["name"]] = client.collections.get(name).aggregate.over_all(
-                    total_count=True).total_count
+                counts[src["name"]] = client.collections.get(name).aggregate.over_all(total_count=True).total_count
             else:
                 counts[src["name"]] = None
         except Exception:
@@ -1071,20 +1139,32 @@ def launch_ingest(source: str, label: str) -> None:
     run_id = run_id_from_now()
     path = status_path(STATUS_DIR, run_id, source)
     cmd = [
-        sys.executable, "app/runner.py",
-        "--source", source, "--run-id", run_id,
-        "--operation", "ingest", "--start-step", START_STEPS[label],
+        sys.executable,
+        "app/runner.py",
+        "--source",
+        source,
+        "--run-id",
+        run_id,
+        "--operation",
+        "ingest",
+        "--start-step",
+        START_STEPS[label],
     ]
     try:
         subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception as exc:  # ex. python introuvable : on trace un run failed
         STATUS_DIR.mkdir(parents=True, exist_ok=True)
-        create_run_file(path, run_id=run_id, source=source, operation="ingest",
-                        start_step=START_STEPS[label],
-                        steps=[START_STEPS[label]], status_dir=STATUS_DIR)
+        create_run_file(
+            path,
+            run_id=run_id,
+            source=source,
+            operation="ingest",
+            start_step=START_STEPS[label],
+            steps=[START_STEPS[label]],
+            status_dir=STATUS_DIR,
+        )
         mark_failed(path, f"impossible de lancer le runner: {exc}")
-    st.session_state["active"] = {"run_id": run_id, "source": source,
-                                  "label": label, "path": str(path)}
+    st.session_state["active"] = {"run_id": run_id, "source": source, "label": label, "path": str(path)}
 
 
 def purge_collection(source: str) -> None:
@@ -1092,8 +1172,15 @@ def purge_collection(source: str) -> None:
     run_id = run_id_from_now()
     path = status_path(STATUS_DIR, run_id, source)
     STATUS_DIR.mkdir(parents=True, exist_ok=True)
-    create_run_file(path, run_id=run_id, source=source, operation="purge",
-                    start_step="purge", steps=["purge"], status_dir=STATUS_DIR)
+    create_run_file(
+        path,
+        run_id=run_id,
+        source=source,
+        operation="purge",
+        start_step="purge",
+        steps=["purge"],
+        status_dir=STATUS_DIR,
+    )
     try:
         client = connect_client()
         existing = set(client.collections.list_all())
@@ -1137,8 +1224,7 @@ def render_history() -> None:
         return
     for r in runs:
         status = r.get("status", "?")
-        emoji = {"done": "✅", "failed": "❌", "running": "🔄",
-                 "cancelled": "⏹️"}.get(status, "❔")
+        emoji = {"done": "✅", "failed": "❌", "running": "🔄", "cancelled": "⏹️"}.get(status, "❔")
         with st.expander(f"{emoji} {r['run_id']} — {r['source']} ({r['operation']})"):
             st.json(r)
 
@@ -1149,8 +1235,10 @@ def main() -> None:
 
     ok = weaviate_ready()
     if not ok:
-        st.warning(f"Weaviate injoignable sur {config.WEAVIATE_HOST}:{config.WEAVIATE_PORT} — "
-                   "les collections affichées seront vides (les runs restent possibles).")
+        st.warning(
+            f"Weaviate injoignable sur {config.WEAVIATE_HOST}:{config.WEAVIATE_PORT} — "
+            "les collections affichées seront vides (les runs restent possibles)."
+        )
 
     counts = collection_counts()
 

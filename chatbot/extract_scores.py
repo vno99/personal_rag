@@ -6,6 +6,7 @@ renvoyé par Weaviate ; si Weaviate change son format, le parseur retourne
 silencieusement `None` et la fusion multi-collections dégrade. Le contrat
 est verrouillé par `tests/test_extract_scores.py`.
 """
+
 import re
 
 

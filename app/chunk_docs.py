@@ -1,13 +1,13 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 
-import config.config as config
+from config import config
 from config.logger_config import setup_logging
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from transformers import AutoTokenizer
-import os
 
 logger = setup_logging(__name__)
 
@@ -32,7 +32,7 @@ SPLITTER = RecursiveCharacterTextSplitter.from_huggingface_tokenizer(
 
 
 def make_chunk_id(source, chunk_index, content):
-    raw = f"{source}::{chunk_index}::{content}".encode("utf-8")
+    raw = f"{source}::{chunk_index}::{content}".encode()
     return hashlib.sha1(raw).hexdigest()
 
 
@@ -61,15 +61,17 @@ def chunk_one_record(record, splitter=SPLITTER, tokenizer=TOKENIZER):
 
         chunk_id = make_chunk_id(source or "unknown", chunk_index, chunk_text)
 
-        output.append({
-            "chunk_id": chunk_id,
-            "source": source,
-            "loc": loc,
-            "lastmod": lastmod,
-            "chunk_index": chunk_index,
-            "chunk_size": n_tokens,
-            "content": chunk_text,
-        })
+        output.append(
+            {
+                "chunk_id": chunk_id,
+                "source": source,
+                "loc": loc,
+                "lastmod": lastmod,
+                "chunk_index": chunk_index,
+                "chunk_size": n_tokens,
+                "content": chunk_text,
+            }
+        )
 
     return output
 
@@ -84,8 +86,7 @@ def run(source_name: str, status=None) -> None:
     if not input_files:
         logger.info(f"Aucun fichier {docs_pattern}*.{config.JSONL_EXT} trouvé dans {RAW_DIR}")
         if status is not None:
-            raise RuntimeError(
-                f"aucun fichier {docs_pattern}*.{config.JSONL_EXT} pour la source '{source_name}'")
+            raise RuntimeError(f"aucun fichier {docs_pattern}*.{config.JSONL_EXT} pour la source '{source_name}'")
         return
 
     total_files = len(input_files)

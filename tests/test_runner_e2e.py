@@ -15,10 +15,10 @@ que le runner :
 C'est le test e2e le moins cher : pas de réseau, pas de Weaviate,
 pas de chargement du tokenizer, <1 seconde.
 """
+
 import subprocess
 import sys
 from pathlib import Path
-
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -44,19 +44,19 @@ def test_runner_subprocess_resolves_cwd():
     """
     # argparse catch la source invalide → exit 2 + message clair.
     result = _run_runner(
-        "--source", "source_qui_nexiste_pas_e2e",
-        "--run-id", "2099-12-31T23-59-59-e2e-cwd",
-        "--operation", "ingest",
-        "--start-step", "get_docs",
+        "--source",
+        "source_qui_nexiste_pas_e2e",
+        "--run-id",
+        "2099-12-31T23-59-59-e2e-cwd",
+        "--operation",
+        "ingest",
+        "--start-step",
+        "get_docs",
     )
-    assert result.returncode != 0, (
-        f"Le runner devrait échouer sur source inconnue. "
-        f"stderr={result.stderr!r}"
-    )
+    assert result.returncode != 0, f"Le runner devrait échouer sur source inconnue. stderr={result.stderr!r}"
     # Pas d'ImportError : cwd + sys.path résolus.
     assert "ModuleNotFoundError" not in result.stderr, (
-        f"Le runner n'arrive pas à résoudre ses imports (cwd/sys.path). "
-        f"stderr={result.stderr!r}"
+        f"Le runner n'arrive pas à résoudre ses imports (cwd/sys.path). stderr={result.stderr!r}"
     )
     # L'erreur est sur stderr (pas silencieusement avalée).
     assert "invalid choice" in result.stderr or "ValueError" in result.stderr
@@ -67,15 +67,16 @@ def test_runner_subprocess_rejects_unknown_start_step():
     erreur argparse (exit 2 + message clair) sans crasher Python.
     """
     result = _run_runner(
-        "--source", "python",
-        "--run-id", "2099-12-31T23-59-59-e2e-step",
-        "--operation", "ingest",
-        "--start-step", "step_qui_nexiste_pas",
+        "--source",
+        "python",
+        "--run-id",
+        "2099-12-31T23-59-59-e2e-step",
+        "--operation",
+        "ingest",
+        "--start-step",
+        "step_qui_nexiste_pas",
     )
-    assert result.returncode == 2, (
-        f"argparse doit rejeter un start_step invalide (exit 2). "
-        f"stderr={result.stderr!r}"
-    )
+    assert result.returncode == 2, f"argparse doit rejeter un start_step invalide (exit 2). stderr={result.stderr!r}"
     assert "invalid choice" in result.stderr
     assert "step_qui_nexiste_pas" in result.stderr
 
