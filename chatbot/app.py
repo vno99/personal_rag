@@ -7,18 +7,18 @@ from deep_translator import GoogleTranslator
 from extract_scores import extract_scores
 from fusion import fuse, is_in_scope
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_mistralai import ChatMistralAI
+from langchain_openai import ChatOpenAI
 from langdetect import detect
 from weaviate.classes.query import HybridFusion, MetadataQuery
 
 WEAVIATE_HOST = os.getenv("WEAVIATE_HOST", "host.docker.internal")
 WEAVIATE_PORT = int(os.getenv("WEAVIATE_PORT", "9090"))
 WEAVIATE_GRPC_PORT = int(os.getenv("WEAVIATE_GRPC_PORT", "50051"))
-MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 # Sentinelle du `.env_example` : si l'utilisateur a copié le template sans
 # remplacer la valeur, on l'alerte plutôt que de le laisser échouer à la
 # première question (cf. code review E).
-_MISTRAL_SENTINEL = "aaaaaaaaaaaaaaaaaaa"
+_OPENROUTER_SENTINEL = "aaaaaaaaaaaaaaaaaaa"
 
 EMBEDDING_MODEL = "sentence-transformers/all-mpnet-base-v2"
 
@@ -30,7 +30,7 @@ TOP_K = 3
 ALPHA = 0.7
 TEMPERATURE = 0.1
 MAX_TOKEN = 1500
-LLM_MODEL = os.getenv("MISTRAL_MODEL", "mistral-medium-latest")
+LLM_MODEL = os.getenv("MISTRAL_MODEL", "mistralai/mistral-medium-latest")
 
 COLLECTIONS = [
     {"name": "SnowflakeDocs", "description": "Snowflake documentation : https://docs.snowflake.com"},
@@ -243,9 +243,9 @@ def main():
                 index=2,  # Français
             )
 
-        if not MISTRAL_API_KEY or MISTRAL_API_KEY == _MISTRAL_SENTINEL:
+        if not OPENROUTER_API_KEY or OPENROUTER_API_KEY == _OPENROUTER_SENTINEL:
             st.warning(
-                "⚠️ `MISTRAL_API_KEY` non définie (ou valeur sentinelle du "
+                "⚠️ `OPENROUTER_API_KEY` non définie (ou valeur sentinelle du "
                 "`.env_example`). Copie `.env_example` vers `.env` et "
                 "remplace la valeur. Les réponses LLM échoueront sinon.",
             )
@@ -280,7 +280,7 @@ def main():
 
         # Display assistant response in chat message container
         with st.chat_message("assistant"):
-            with st.spinner("🔍 Retrieval + MistralAI..."):
+            with st.spinner("🔍 Retrieval + OpenRouter..."):
                 try:
                     # 1. Retrieval
                     result = retrieve_context(
@@ -293,17 +293,18 @@ def main():
                         fallback = FALLBACK_MESSAGES[selected_language]
                         st.markdown(fallback)
                     else:
-                        # Si la clé Mistral est manquante/sentinelle, on évite
+                        # Si la clé OpenRouter est manquante/sentinelle, on évite
                         # de créer le LLM (coût réseau) et on retourne un fallback.
-                        if not MISTRAL_API_KEY or MISTRAL_API_KEY == _MISTRAL_SENTINEL:
+                        if not OPENROUTER_API_KEY or OPENROUTER_API_KEY == _OPENROUTER_SENTINEL:
                             fallback = FALLBACK_MESSAGES[selected_language]
                             st.markdown(fallback)
                         else:
                             context = result["context"]
 
-                            llm = ChatMistralAI(
+                            llm = ChatOpenAI(
                                 model=LLM_MODEL,
-                                api_key=MISTRAL_API_KEY,
+                                api_key=OPENROUTER_API_KEY,
+                                base_url="https://openrouter.ai/api/v1",
                                 temperature=TEMPERATURE,
                                 max_tokens=MAX_TOKEN,
                             )
