@@ -1,4 +1,3 @@
-import os
 from unittest.mock import MagicMock, patch
 
 import admin.app as admin_app
@@ -63,10 +62,12 @@ def test_render_history_empty():
 
 def test_purge_collection():
     # Teste purge_collection avec mock weaviate et status_writer
-    with patch("admin.app.connect_client") as mock_client, \
-         patch("admin.app.create_run_file"), \
-         patch("admin.app.mark_done"), \
-         patch("admin.app.mark_failed"):
+    with (
+        patch("admin.app.connect_client") as mock_client,
+        patch("admin.app.create_run_file"),
+        patch("admin.app.mark_done"),
+        patch("admin.app.mark_failed"),
+    ):
         mock_client.return_value.collections.list_all.return_value = ["PythonDocs"]
         admin_app.purge_collection("python")
 
@@ -76,7 +77,6 @@ def test_kill_active():
     mock_proc = MagicMock()
     mock_proc.poll.return_value = 0
     with patch.dict("streamlit.session_state", {"proc": mock_proc, "stderr_file": None}, clear=False):
-        entry = {"path": "/tmp/fake.json"}
-        with patch("admin.app.read_run", return_value={"status": "running"}), \
-             patch("admin.app.mark_cancelled"):
+        entry = {"path": "tests/fake_status.json"}
+        with patch("admin.app.read_run", return_value={"status": "running"}), patch("admin.app.mark_cancelled"):
             admin_app.kill_active(entry)
