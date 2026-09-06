@@ -36,7 +36,7 @@ jobs:
         run: mypy app/ chatbot/ tests/
 
       - name: Run tests with coverage
-        run: python -m pytest tests/ -v --cov=.
+        run: python -m pytest tests/ -v --cov=. --cov-fail-under=40
 
       - name: Check Python syntax
         run: |
@@ -47,7 +47,19 @@ jobs:
           python -c "import app.config.config as c; print('config OK:', c.ALPHA, c.SOURCES[0]['name'])"
           python -c "from chatbot.fusion import fuse, is_in_scope; print('fusion OK')"
 
-      - name: Verify docs keywords
+      - name: Security audit dependencies
+        run: |
+          pip install pip-audit
+          pip-audit --desc || true
+
+      - name: Verify .env_example and .gitignore
+        run: |
+          test -f chatbot/.env_example || exit 1
+          test -f .gitignore || exit 1
+          echo ".env_example and .gitignore present OK"
+
+      - name: Verify docker-compose config
+        run: docker-compose config
         run: |
           grep -q "Snowflake\|Databricks\|Next.js\|TypeScript\|Python" README.md || exit 1
           grep -q "Phase B\|fusion\|admin" CLAUDE.md || exit 1
