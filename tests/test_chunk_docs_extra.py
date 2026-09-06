@@ -1,8 +1,7 @@
 import json
-import pytest
-from pathlib import Path
+
 import chunk_docs
-from chunk_docs import run, chunk_one_record, make_chunk_id
+from chunk_docs import chunk_one_record, make_chunk_id, run
 
 
 class FakeStatus:

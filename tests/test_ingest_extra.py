@@ -1,6 +1,4 @@
-import pytest
-import ingest_weaviate
-from ingest_weaviate import get_embeddings, read_jsonl_file, batch_iterable, run
+from ingest_weaviate import batch_iterable, get_embeddings, read_jsonl_file
 
 
 class FakeStatus:

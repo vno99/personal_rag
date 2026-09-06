@@ -1,8 +1,7 @@
-import pytest
 import json
-from pathlib import Path
+
 import ingest_weaviate
-from ingest_weaviate import ingest_file, get_collection, get_embeddings
+from ingest_weaviate import ingest_file
 
 
 class FakeResponse:

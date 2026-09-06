@@ -1,4 +1,3 @@
-import pytest
 import ingest_weaviate
 from ingest_weaviate import get_collection
 
@@ -37,5 +36,5 @@ def test_get_collection_creates_new(monkeypatch):
     monkeypatch.setattr(ingest_weaviate, "connect_client", lambda: client)
     monkeypatch.setattr(ingest_weaviate, "CHUNKS_DATA_DIR", type("P", (), {"glob": lambda *a, **k: []})())
     # On ne lance pas run complet, juste get_collection via le mock
-    coll = get_collection(client, "NewColl")
+    get_collection(client, "NewColl")
     assert "NewColl" in client.list_all()
