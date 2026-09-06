@@ -339,46 +339,46 @@ def main():
                                 max_tokens=MAX_TOKEN,
                             )
 
-                        rag_prompt = f"""<|role|>EXPERT<|end|>
+                            rag_prompt = f"""<|role|>EXPERT<|end|>
 
-                        AVAILABLE CONTEXT:
-                        {_escape_context(context)}
+                            AVAILABLE CONTEXT:
+                            {_escape_context(context)}
 
-                        QUESTION: {_escape_context(prompt)}
+                            QUESTION: {_escape_context(prompt)}
 
-                        <|instructions|>
-                        1. Provide a concise and complete answer. 
-                           Stick strictly to the provided context.
-                           If the information is dense, use bullet points to maintain clarity.
-                        2. If the information is not present in the context, reply only with: "Not in the provided documentation."
-                           Do not add any other information.
-                        3. For SQL/Python code, provide an exact copy from the context.
-                        4. Language: {selected_language} (technical tone).
-                        <|end|>
+                            <|instructions|>
+                            1. Provide a concise and complete answer.
+                               Stick strictly to the provided context.
+                               If the information is dense, use bullet points to maintain clarity.
+                            2. If the information is not present in the context, reply only with: "Not in the provided documentation."
+                               Do not add any other information.
+                            3. For SQL/Python code, provide an exact copy from the context.
+                            4. Language: {selected_language} (technical tone).
+                            <|end|>
 
-                        ANSWER:"""
+                            ANSWER:"""
 
-                        response = llm.invoke(rag_prompt)
-                        full_response = response.content
+                            response = llm.invoke(rag_prompt)
+                            full_response = response.content
 
-                        # Add assistant response to chat history
-                        message = {
-                            "role": "assistant", 
-                            "content": full_response,
-                            "sources": result["sources"]
-                        }
-                        st.session_state.messages.append(message)
-                        # Cap mémoire après chaque ajout (cf. 6e vague).
-                        st.session_state.messages = st.session_state.messages[-20:]
+                            # Add assistant response to chat history
+                            message = {
+                                "role": "assistant",
+                                "content": full_response,
+                                "sources": result["sources"]
+                            }
+                            st.session_state.messages.append(message)
+                            # Cap mémoire après chaque ajout (cf. 6e vague).
+                            st.session_state.messages = st.session_state.messages[-20:]
 
-                        # Show the response
-                        st.markdown(full_response)
+                            # Show the response
+                            st.markdown(full_response)
 
-                        # Show sources if available
-                        if "sources" in message and message["sources"]:
-                            with st.expander("📚 Sources"):
-                                for i, src in enumerate(message["sources"]):
-                                    st.markdown(f"**#{i+1}** [{src}]({src})")
+                            # Show sources if available
+                            if "sources" in message and message["sources"]:
+                                with st.expander("📚 Sources"):
+                                    for i, src in enumerate(message["sources"]):
+                                        st.markdown(f"**#{i+1}** [{src}]({src})")
 
                 except Exception as e:
                     full_response = f"⚠️ Erreur : {e}"

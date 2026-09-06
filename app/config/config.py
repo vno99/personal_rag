@@ -1,5 +1,7 @@
 import os
 
+import torch
+
 # Constantes globales (indépendantes de la source)
 JSONL_EXT = "jsonl"
 
@@ -29,7 +31,10 @@ MAX_TOKEN_SIZE = 512
 BATCH_SIZE_DOCS = 500
 BATCH_SIZE_WEAVIATE = 100
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-mpnet-base-v2"
-EMBEDDING_DEVICE = "cuda:0"
+# Device d'embedding unique pour tout le projet (pipeline + chatbot).
+# On préfère CUDA quand disponible, sinon CPU. Centralisé ici pour que les
+# scripts n'aient pas à dupliquer la garde.
+EMBEDDING_DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 NORMALIZE_EMBEDDINGS = True
 
 # Sources de documentation
