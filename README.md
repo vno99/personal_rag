@@ -17,7 +17,7 @@ Application personnelle de **RAG (Retrieval-Augmented Generation)** : indexe des
 ## Stack
 
 - **Pipeline** (`app/`) : extraction (`extractors/`), chunking (`chunk_docs.py`), embedding + indexation (`ingest_weaviate.py`), statut (`status_writer.py`).
-- **Chatbot** (`chatbot/`) : Streamlit + `ChatMistralAI` (modèle par défaut `mistral-medium-latest`, surchargeable via `MISTRAL_MODEL`).
+- **Chatbot** (`chatbot/`) : Streamlit + `ChatOpenAI` via OpenRouter (modèle `mistralai/mistral-medium-latest`, surchargeable via `MISTRAL_MODEL`).
 - **DB** : Weaviate 1.31 (`docker-compose.yml`), vecteurs fournis côté client (`DEFAULT_VECTORIZER_MODULE: none`).
 
 ## Commandes essentielles

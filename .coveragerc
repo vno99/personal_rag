@@ -1,0 +1,4 @@
+[run]
+source = app, chatbot, admin
+omit = */tests/*
+branch = True

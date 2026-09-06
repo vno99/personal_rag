@@ -1,0 +1,8 @@
+line-length = 120
+
+[lint]
+select = ["E", "F", "I", "W", "N", "PL", "SIM", "BLE", "DTZ", "S"]
+ignore = ["BLE001", "S110", "SIM117", "DTZ005", "PLW1510", "PLR0402", "S603", "S324", "E402", "PLC0415", "SIM105", "PLR0912", "PLR0915", "PLW2901", "W293", "W292", "N806", "S310", "S607", "SIM108", "PLR0913", "E501", "W291", "PLW0108", "PLR5501"]
+
+[lint.extend-per-file-ignores]
+"tests/*" = ["S101", "PLR2004"]

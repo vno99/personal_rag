@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from extractors.sitemap import SitemapExtractor
 
 
@@ -48,6 +46,7 @@ def test_sitemap_extractor_writes_batches(tmp_path):
     lines = written[0].read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 2
     import json
+
     record = json.loads(lines[0])
     assert record["source"] == "https://x.com/a"
     assert record["lastmod"] == "2026-01-01"
@@ -75,10 +74,12 @@ def test_sitemap_extractor_resumes_at_next_batch(tmp_path):
         return BlockedLoader([FakeDoc("nouveau", "https://x.com/new", "new", "2026-02-01")])
 
     source = {
-        "name": "nextjs", "type": "sitemap",
+        "name": "nextjs",
+        "type": "sitemap",
         "sitemap_url": "https://nextjs.org/sitemap.xml",
         "filter_urls": [r"https://nextjs\.org/docs/.*"],
-        "collection": "NextJSDocs", "content_selector": "article",
+        "collection": "NextJSDocs",
+        "content_selector": "article",
     }
     extractor = SitemapExtractor(source, tmp_path, batch_size=500, loader_factory=loader_factory)
     written = extractor.extract()
@@ -100,10 +101,12 @@ def test_sitemap_extractor_reports_progress(tmp_path):
         return FakeLoader(docs)
 
     source = {
-        "name": "nextjs", "type": "sitemap",
+        "name": "nextjs",
+        "type": "sitemap",
         "sitemap_url": "https://nextjs.org/sitemap.xml",
         "filter_urls": [r"https://nextjs\.org/docs/.*"],
-        "collection": "NextJSDocs", "content_selector": "article",
+        "collection": "NextJSDocs",
+        "content_selector": "article",
     }
     calls = []
     extractor = SitemapExtractor(source, tmp_path, batch_size=500, loader_factory=loader_factory)

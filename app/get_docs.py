@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-import config.config as config
+from config import config
 from config.logger_config import setup_logging
 from extractors.archive import ArchiveExtractor
 from extractors.git import GitExtractor

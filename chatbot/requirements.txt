@@ -5,7 +5,7 @@ scikit-learn
 matplotlib
 seaborn
 plotly
-langchain_mistralai
+langchain-openai
 torchvision
 weaviate-client==4.21.0
 langchain-huggingface==1.2.2

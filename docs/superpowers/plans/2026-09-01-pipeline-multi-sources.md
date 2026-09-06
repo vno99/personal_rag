@@ -158,6 +158,7 @@ def test_get_source_returns_dict():
 
 def test_get_source_unknown_raises():
     import pytest
+
     with pytest.raises(KeyError):
         config.get_source("inexistant")
 
@@ -493,6 +494,7 @@ def test_sitemap_extractor_writes_batches(tmp_path):
     lines = written[0].read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 2
     import json
+
     record = json.loads(lines[0])
     assert record["source"] == "https://x.com/a"
     assert record["lastmod"] == "2026-01-01"
@@ -510,10 +512,12 @@ def test_sitemap_extractor_resumes_at_next_batch(tmp_path):
         return FakeLoader([FakeDoc("nouveau", "https://x.com/new", "new", "2026-02-01")])
 
     source = {
-        "name": "nextjs", "type": "sitemap",
+        "name": "nextjs",
+        "type": "sitemap",
         "sitemap_url": "https://nextjs.org/sitemap.xml",
         "filter_urls": [r"https://nextjs\.org/docs/.*"],
-        "collection": "NextJSDocs", "content_selector": "article",
+        "collection": "NextJSDocs",
+        "content_selector": "article",
     }
     extractor = SitemapExtractor(source, tmp_path, batch_size=500, loader_factory=loader_factory)
     written = extractor.extract()
@@ -713,18 +717,12 @@ def make_local_repo(root: Path) -> Path:
     repo = root / "repo"
     repo.mkdir()
     subprocess.run(["git", "init", "-q", str(repo)], check=True)
-    subprocess.run(
-        ["git", "-C", str(repo), "config", "user.email", "test@test.com"], check=True
-    )
-    subprocess.run(
-        ["git", "-C", str(repo), "config", "user.name", "Test"], check=True
-    )
+    subprocess.run(["git", "-C", str(repo), "config", "user.email", "test@test.com"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "Test"], check=True)
     (repo / "docs").mkdir()
     (repo / "docs" / "intro.md").write_text("# Intro\nTexte d'intro.", encoding="utf-8")
     subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
-    subprocess.run(
-        ["git", "-C", str(repo), "commit", "-q", "-m", "init"], check=True
-    )
+    subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "init"], check=True)
     return repo
 
 
@@ -746,6 +744,7 @@ def test_git_extractor_reads_markdown(tmp_path):
     lines = written[0].read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 1
     import json
+
     record = json.loads(lines[0])
     assert record["loc"] == "intro.md"
     assert "# Intro" in record["content"]
@@ -915,6 +914,7 @@ def test_archive_extractor_parses_html(tmp_path):
     lines = written[0].read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 2
     import json
+
     record = json.loads(lines[0])
     assert record["source"] == "https://docs.python.org/3.14/library/os.html"
     assert "Module OS." in record["content"]
@@ -1157,15 +1157,17 @@ def chunk_one_record(record, splitter=SPLITTER, tokenizer=TOKENIZER):
 
         chunk_id = make_chunk_id(source or "unknown", chunk_index, chunk_text)
 
-        output.append({
-            "chunk_id": chunk_id,
-            "source": source,
-            "loc": loc,
-            "lastmod": lastmod,
-            "chunk_index": chunk_index,
-            "chunk_size": n_tokens,
-            "content": chunk_text,
-        })
+        output.append(
+            {
+                "chunk_id": chunk_id,
+                "source": source,
+                "loc": loc,
+                "lastmod": lastmod,
+                "chunk_index": chunk_index,
+                "chunk_size": n_tokens,
+                "content": chunk_text,
+            }
+        )
 
     return output
 

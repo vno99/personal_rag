@@ -42,8 +42,8 @@ def test_fuse_drops_results_without_vector_score():
 
 
 def test_fuse_orders_by_norm_score_desc():
-    col_a = [_res(100, 0.5), _res(200, 0.6)]   # normés en interne -> 0.0, 1.0
-    col_b = [_res(10, 0.7), _res(20, 0.8)]     # normés en interne -> 0.0, 1.0
+    col_a = [_res(100, 0.5), _res(200, 0.6)]  # normés en interne -> 0.0, 1.0
+    col_b = [_res(10, 0.7), _res(20, 0.8)]  # normés en interne -> 0.0, 1.0
     fused = fuse([col_a, col_b], top_k=3)
     assert len(fused) == 3
     # les deux "meilleurs" de chaque collection arrivent en tête (norm_score 1.0)

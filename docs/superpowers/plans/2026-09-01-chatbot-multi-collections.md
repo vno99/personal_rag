@@ -79,8 +79,8 @@ def test_normalize_minmax_flat_scores_are_all_one():
 
 
 def test_fuse_orders_by_norm_score_desc():
-    col_a = [_res(100, 0.5), _res(200, 0.6)]   # normés en interne -> 0.0, 1.0
-    col_b = [_res(10, 0.7), _res(20, 0.8)]     # normés en interne -> 0.0, 1.0
+    col_a = [_res(100, 0.5), _res(200, 0.6)]  # normés en interne -> 0.0, 1.0
+    col_b = [_res(10, 0.7), _res(20, 0.8)]  # normés en interne -> 0.0, 1.0
     fused = fuse([col_a, col_b], top_k=3)
     assert len(fused) == 3
     # les deux "meilleurs" de chaque collection arrivent en tête
@@ -170,11 +170,7 @@ def fuse(results_by_collection, top_k=3):
     Returns:
         list[dict]: Résultats fusionnés et triés, chaque dict ayant `norm_score`.
     """
-    normalized = [
-        item
-        for collection in results_by_collection
-        for item in normalize_minmax(collection)
-    ]
+    normalized = [item for collection in results_by_collection for item in normalize_minmax(collection)]
     normalized.sort(key=lambda r: r["norm_score"], reverse=True)
     return normalized[:top_k]
 
@@ -224,26 +220,11 @@ Dans `chatbot/app.py`, remplacer la constante `COLLECTIONS` pour refléter les 5
 
 ```python
 COLLECTIONS = [
-    {
-        "name": "SnowflakeDocs",
-        "description": "Snowflake documentation : https://docs.snowflake.com"
-    },
-    {
-        "name": "DatabricksDocs",
-        "description": "Databricks documentation : https://docs.databricks.com/en"
-    },
-    {
-        "name": "NextJSDocs",
-        "description": "Next.js documentation : https://nextjs.org/docs"
-    },
-    {
-        "name": "TypeScriptDocs",
-        "description": "TypeScript documentation : https://www.typescriptlang.org/docs"
-    },
-    {
-        "name": "PythonDocs",
-        "description": "Python documentation : https://docs.python.org/3"
-    },
+    {"name": "SnowflakeDocs", "description": "Snowflake documentation : https://docs.snowflake.com"},
+    {"name": "DatabricksDocs", "description": "Databricks documentation : https://docs.databricks.com/en"},
+    {"name": "NextJSDocs", "description": "Next.js documentation : https://nextjs.org/docs"},
+    {"name": "TypeScriptDocs", "description": "TypeScript documentation : https://www.typescriptlang.org/docs"},
+    {"name": "PythonDocs", "description": "Python documentation : https://docs.python.org/3"},
 ]
 ```
 
@@ -320,15 +301,17 @@ def query_one_collection(client, collection_name, query_text_en, query_vector, t
         explain_score = obj.metadata.explain_score or ""
         vector_score, keyword_score = extract_scores(explain_score)
 
-        results.append({
-            "collection": collection_name,
-            "content": props.get("content", ""),
-            "source": props.get("source", "N/A"),
-            "hybrid_score": float(obj.metadata.score) if obj.metadata.score is not None else 0.0,
-            "vector_score": vector_score,
-            "keyword_score": keyword_score,
-            "explain_score": explain_score,
-        })
+        results.append(
+            {
+                "collection": collection_name,
+                "content": props.get("content", ""),
+                "source": props.get("source", "N/A"),
+                "hybrid_score": float(obj.metadata.score) if obj.metadata.score is not None else 0.0,
+                "vector_score": vector_score,
+                "keyword_score": keyword_score,
+                "explain_score": explain_score,
+            }
+        )
 
     return results
 
@@ -357,8 +340,7 @@ def retrieve_context(query_text, top_k=TOP_K, collections=None):
 
     try:
         results_by_collection = [
-            query_one_collection(client, name, query_text_en, query_vector, top_k)
-            for name in collections
+            query_one_collection(client, name, query_text_en, query_vector, top_k) for name in collections
         ]
 
         fused = fuse(results_by_collection, top_k=top_k)

@@ -1,9 +1,8 @@
 import argparse
 
-import config.config as config
 import weaviate
+from config import config
 from langchain_huggingface import HuggingFaceEmbeddings
-from weaviate.classes.query import MetadataQuery
 
 QUERY_TEXT = "What is Unity Catalog?"
 LIMIT = 3

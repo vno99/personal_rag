@@ -1,4 +1,4 @@
-import config.config as config
+from config import config
 
 
 def test_sources_is_list_of_dicts():
@@ -38,6 +38,7 @@ def test_get_source_returns_dict():
 
 def test_get_source_unknown_raises():
     import pytest
+
     with pytest.raises(KeyError):
         config.get_source("inexistant")
 

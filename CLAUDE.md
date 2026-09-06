@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Vue d'ensemble
 
-Application de **RAG (Retrieval-Augmented Generation)** personnelle : elle indexe de la documentation technique dans **Weaviate** et la rend interrogable via un chatbot **Streamlit**. La recherche est **hybride** (dense + BM25/sparse), fusionnée par Weaviate avec un `alpha=0.7`. Embeddings `sentence-transformers/all-mpnet-base-v2` générés côté client (HuggingFace), LLM de génération `ChatMistralAI` (modèle par défaut `mistral-medium-latest`, surchargeable via la variable d'env `MISTRAL_MODEL`).
+Application de **RAG (Retrieval-Augmented Generation)** personnelle : elle indexe de la documentation technique dans **Weaviate** et la rend interrogable via un chatbot **Streamlit**. La recherche est **hybride** (dense + BM25/sparse), fusionnée par Weaviate avec un `alpha=0.7`. Embeddings `sentence-transformers/all-mpnet-base-v2` générés côté client (HuggingFace), LLM de génération `ChatOpenAI` via OpenRouter (modèle par défaut `mistralai/mistral-medium-latest`, surchargeable via `MISTRAL_MODEL`).
 
 Le repo est découpé en **trois mondes indépendants** :
 
@@ -70,12 +70,12 @@ Le logging est configuré par `app/config/logging.yml` (console + fichier rotati
 L'interface Streamlit vit dans `app.py` ; la logique de fusion multi-collections est extraite dans `fusion.py` (module **pur**, sans dépendance Streamlit/Weaviate, importé par `app.py`). `extract_scores.py` parse le `explain_score` de Weaviate en `vector_score` / `keyword_score`. À chaque question, l'app :
 1. **Traduit en anglais si nécessaire** (`langdetect` + `deep_translator` GoogleTranslator), puis embedde la requête.
 2. **Recherche hybride multi-collections** : une requête Weaviate par collection sélectionnée dans la sidebar (`alpha=0.7`, `fusion_type=RELATIVE_SCORE`, `top_k` réglable), puis **fusion min-max** via `fusion.py` (normalisation en [0,1] par collection, tri, tie-break `vector_score`). La pertinence est validée par un seuil `MIN_VECTOR_SCORE=0.45` sur le `vector_score` brut du top-1 fusionné (parsé depuis `explain_score`) : sous le seuil, l'app renvoie un message de repli au lieu d'inventer une réponse.
-3. **Génère** avec `ChatMistralAI` un prompt RAG strict : la réponse doit rester dans le contexte fourni, code SQL/Python copié tel quel. La langue de réponse est sélectionnable (FR/EN/DE/NL) via `LANGUAGES`.
+3. **Génère** avec `ChatOpenAI` via OpenRouter un prompt RAG strict : la réponse doit rester dans le contexte fourni, code SQL/Python copié tel quel. La langue de réponse est sélectionnable (FR/EN/DE/NL) via `LANGUAGES`.
 
 Points d'attention :
 - `WEAVIATE_HOST = "host.docker.internal"` et les ports sont **codés en dur** (pas via `config.py`).
 - La liste `COLLECTIONS` (5 entrées : Snowflake, Databricks, Next.js, TypeScript, Python) et le `COLLECTION_NAME` par défaut (utilisé comme repli de `retrieve_context`) doivent **rester synchronisés** avec les collections réellement ingérées par le pipeline.
-- La clé `MISTRAL_API_KEY` vient de la variable d'environnement (voir `chatbot/.env_example`, avec une valeur sentinelle `aaaaaaaaaaaaaaaaaaa` pour alerter l'utilisateur au démarrage).
+- La clé `OPENROUTER_API_KEY` vient de la variable d'environnement (voir `chatbot/.env_example`, avec une valeur sentinelle `aaaaaaaaaaaaaaaaaaa` pour alerter l'utilisateur au démarrage).
 - Les `@st.cache_resource` / `@st.cache_data` cachent respectivement le modèle d'embedding (mémoire) et les traductions (1h).
 
 ### Administration (`admin/app.py`, `app/runner.py`, `app/status_writer.py`)
@@ -108,7 +108,7 @@ streamlit run app.py
 
 # Chatbot — conteneurisé
 docker build . -t personal_chatbot --no-cache
-docker run -e PORT=7862 -e MISTRAL_API_KEY="<clé>" -p 7862:7862 personal_chatbot
+docker run -e PORT=7862 -e OPENROUTER_API_KEY="<clé>" -p 7862:7862 personal_chatbot
 # → http://localhost:7862/
 
 # Admin pipeline — en développement (lancer depuis la racine ; Weaviate local requis)

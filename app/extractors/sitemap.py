@@ -1,9 +1,8 @@
 from pathlib import Path
 
 from bs4 import BeautifulSoup
+from config import config
 from langchain_community.document_loaders.sitemap import SitemapLoader
-
-import config.config as config
 
 from extractors.base import BaseExtractor
 from extractors.html_content import extract_from_soup

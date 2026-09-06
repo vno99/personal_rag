@@ -4,12 +4,11 @@ import zipfile
 from pathlib import Path
 
 from bs4 import BeautifulSoup
-
-import config.config as config
+from config import config
 from config.logger_config import setup_logging
+
 from extractors.base import BaseExtractor
 from extractors.html_content import extract_from_soup
-
 
 logger = setup_logging(__name__)
 
@@ -43,11 +42,8 @@ class ArchiveExtractor(BaseExtractor):
             # au lieu de bloquer indéfiniment (cf. code review D).
             # urlretrieve ne supporte pas `timeout` en Python 3.12 ;
             # on utilise urlopen + écriture manuelle (cf. code review archive).
-            with urllib.request.urlopen(
-                self.archive_url, timeout=60
-            ) as response:
-                with open(dest, "wb") as f:
-                    f.write(response.read())
+            with urllib.request.urlopen(self.archive_url, timeout=60) as response, open(dest, "wb") as f:
+                f.write(response.read())
         return dest
 
     def _extract_zip(self, archive: Path) -> Path:
