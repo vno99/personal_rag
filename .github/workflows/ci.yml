@@ -2,73 +2,110 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+      - name: Lint
+        run: ruff check .
 
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+      - name: Format check
+        run: ruff format --check .
+
+  type-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          pip install mypy
+      - name: Type check
+        run: mypy app/ chatbot/ tests/
+
+  tests-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
           pip install -r requirements-ci.txt
           pip install torch==2.6.0+cpu torchvision==0.21.0+cpu torchaudio==2.6.0+cpu --index-url https://download.pytorch.org/whl/cpu
-          pip install ruff mypy pytest-cov
-
-      - name: Lint
-        run: ruff check .
-
-      - name: Format check
-        run: ruff format --check .
-
-      - name: Type check
-        run: mypy app/ chatbot/ tests/
-
+          pip install pytest-cov
       - name: Run tests with coverage
         run: python -m pytest tests/ -v --cov=. --cov-fail-under=80
 
-      - name: Check Python syntax
-        run: |
-          find . -name "*.py" -type f ! -path "./data/*" -exec python -m py_compile {} + || exit 1
-
-      - name: Verify imports and config
-        run: |
-          python -c "import app.config.config as c; print('config OK:', c.ALPHA, c.SOURCES[0]['name'])"
-          python -c "from chatbot.fusion import fuse, is_in_scope; print('fusion OK')"
-
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - name: Security audit dependencies
         run: |
           pip install pip-audit
           pip-audit --desc || true
 
+  docs-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - name: Verify .env_example and .gitignore
         run: |
           test -f chatbot/.env_example || exit 1
           test -f .gitignore || exit 1
           echo ".env_example and .gitignore present OK"
-
-      - name: Verify docker-compose config
-        run: docker compose config
-
       - name: Verify docs keywords
         run: |
           grep -q "Snowflake\|Databricks\|Next.js\|TypeScript\|Python" README.md || exit 1
           grep -q "Phase B\|fusion\|admin" CLAUDE.md || exit 1
           echo "docs keywords OK"
 
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify docker-compose config
+        run: docker compose config
       - name: Build chatbot Docker image
         run: docker build -f chatbot/Dockerfile . -t personal_chatbot
-
       - name: Build admin Docker image
         run: docker build -f admin/Dockerfile . -t personal_admin
