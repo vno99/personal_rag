@@ -15,7 +15,7 @@ COPY chatbot/requirements.txt .
 
 RUN pip install --no-cache-dir torch==2.6.0+cpu torchvision==0.21.0+cpu --index-url https://download.pytorch.org/whl/cpu
 
-RUN pip install --no-cache-dir -r chatbot/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
