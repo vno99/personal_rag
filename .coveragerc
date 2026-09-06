@@ -1,4 +1,5 @@
 [run]
-source = app, chatbot, admin
+source_pkgs = app, chatbot, admin
+branch = False
 omit =
     */tests/*
