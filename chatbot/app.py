@@ -1,4 +1,7 @@
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 import streamlit as st
 import torch
@@ -30,7 +33,8 @@ TOP_K = 3
 ALPHA = 0.7
 TEMPERATURE = 0.1
 MAX_TOKEN = 1500
-LLM_MODEL = os.getenv("MISTRAL_MODEL", "mistralai/mistral-medium-latest")
+LLM_MODEL = os.getenv("OPENROUTER_LLM_MODEL", "minimax/minimax-m2.7:free")
+OPENROUTER_API_BASE = os.getenv("OPENROUTER_API_BASE", "https://openrouter.ai/api/v1")
 
 COLLECTIONS = [
     {"name": "SnowflakeDocs", "description": "Snowflake documentation : https://docs.snowflake.com"},
@@ -304,7 +308,7 @@ def main():
                             llm = ChatOpenAI(
                                 model=LLM_MODEL,
                                 api_key=OPENROUTER_API_KEY,
-                                base_url="https://openrouter.ai/api/v1",
+                                base_url=OPENROUTER_API_BASE,
                                 temperature=TEMPERATURE,
                                 max_tokens=MAX_TOKEN,
                             )

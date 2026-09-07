@@ -1,5 +1,6 @@
 pandas
 gunicorn
+python-dotenv
 streamlit
 scikit-learn
 matplotlib
