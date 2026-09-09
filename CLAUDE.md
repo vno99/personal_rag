@@ -65,18 +65,19 @@ Tous les scripts font `import config.config as config` : **`app/config/config.py
 
 Le logging est configuré par `app/config/logging.yml` (console + fichier rotatif `logs/app.log`), chargé via `app/config/logger_config.py`.
 
-### Chatbot — Streamlit (`chatbot/app.py`) + fusion (`chatbot/fusion.py`)
+### Chatbot — Streamlit (`chatbot/app.py`) + fusion (`chatbot/fusion.py`) + rewrite (`chatbot/rewrite.py`)
 
-L'interface Streamlit vit dans `app.py` ; la logique de fusion multi-collections est extraite dans `fusion.py` (module **pur**, sans dépendance Streamlit/Weaviate, importé par `app.py`). `extract_scores.py` parse le `explain_score` de Weaviate en `vector_score` / `keyword_score`. À chaque question, l'app :
-1. **Traduit en anglais si nécessaire** (`langdetect` + `deep_translator` GoogleTranslator), puis embedde la requête.
-2. **Recherche hybride multi-collections** : une requête Weaviate par collection sélectionnée dans la sidebar (`alpha=0.7`, `fusion_type=RELATIVE_SCORE`, `top_k` réglable), puis **fusion min-max** via `fusion.py` (normalisation en [0,1] par collection, tri, tie-break `vector_score`). La pertinence est validée par un seuil `MIN_VECTOR_SCORE=0.45` sur le `vector_score` brut du top-1 fusionné (parsé depuis `explain_score`) : sous le seuil, l'app renvoie un message de repli au lieu d'inventer une réponse.
-3. **Génère** avec `ChatOpenAI` via OpenRouter un prompt RAG strict : la réponse doit rester dans le contexte fourni, code SQL/Python copié tel quel. La langue de réponse est sélectionnable (FR/EN/DE/NL) via `LANGUAGES`.
+L'interface Streamlit vit dans `app.py` ; la logique de fusion multi-collections est extraite dans `fusion.py` (module **pur**, sans dépendance Streamlit/Weaviate, importé par `app.py`), et la **réécriture de requête** dans `rewrite.py` (module **pur** aussi : prompt + parsing ; l'appel LLM se fait dans `app.py`). `extract_scores.py` parse le `explain_score` de Weaviate en `vector_score` / `keyword_score`. À chaque question, l'app :
+1. **Traduit en anglais si nécessaire** (`langdetect` + `deep_translator` GoogleTranslator). Google Translate renvoie parfois une **page d'erreur 500 en guise de « traduction »** (pas d'exception) : la sortie est validée par `rewrite.is_plausible_translation` (`to_english_query_text`) ; si elle est invraisemblable, on garde le texte source.
+2. **Reformule la question en requête de recherche descriptive** (`rewrite_search_query`, `ChatOpenAI` température 0, few-shot dans `rewrite.build_rewrite_messages`) : les questions courtes/conceptuelles (« what is snowflake ? ») remontent sinon des pages de référence/release-notes hors sujet. Le prompt **traduit en anglais si besoin** (repli quand Google a échoué) et évite de dériver vers les release-notes. Repli sur la question d'origine si clé absente ou appel en échec. Résultat mis en cache 1 h (`@st.cache_data`).
+3. **Recherche hybride multi-collections** : une requête Weaviate par collection sélectionnée dans la sidebar (`alpha=0.7`, `fusion_type=RELATIVE_SCORE`, `top_k` réglable, défaut `TOP_K=6` — contexte élargi pour qu'un chunk conceptuel en rang ~4-6 reste inclus), puis **fusion min-max** via `fusion.py` (normalisation en [0,1] par collection, tri, tie-break `vector_score`). La pertinence est validée par un seuil `MIN_VECTOR_SCORE=0.45` sur le `vector_score` brut du top-1 fusionné (parsé depuis `explain_score`) : sous le seuil, l'app renvoie un message de repli au lieu d'inventer une réponse.
+4. **Génère** avec `ChatOpenAI` via OpenRouter un prompt RAG strict : la réponse doit rester dans le contexte fourni, code SQL/Python copié tel quel. La langue de réponse est sélectionnable (FR/EN/DE/NL) via `LANGUAGES`.
 
 Points d'attention :
 - `WEAVIATE_HOST = "host.docker.internal"` et les ports sont **codés en dur** (pas via `config.py`).
 - La liste `COLLECTIONS` (5 entrées : Snowflake, Databricks, Next.js, TypeScript, Python) et le `COLLECTION_NAME` par défaut (utilisé comme repli de `retrieve_context`) doivent **rester synchronisés** avec les collections réellement ingérées par le pipeline.
 - La clé `OPENROUTER_API_KEY` vient de la variable d'environnement (voir `chatbot/.env_example`, avec une valeur sentinelle `aaaaaaaaaaaaaaaaaaa` pour alerter l'utilisateur au démarrage).
-- Les `@st.cache_resource` / `@st.cache_data` cachent respectivement le modèle d'embedding (mémoire) et les traductions (1h).
+- Les `@st.cache_resource` / `@st.cache_data` cachent respectivement le modèle d'embedding (mémoire), les traductions (1h) et les reformulations (1h).
 
 ### Administration (`admin/app.py`, `app/runner.py`, `app/status_writer.py`)
 

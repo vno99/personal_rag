@@ -158,6 +158,37 @@ class TestTranslateToEnglish:
             mock_translator.assert_called_once()
             assert result == "translated text"
 
+    def test_to_english_query_text_english_input_unchanged(self):
+        """Texte déjà anglais : pas de traduction appelée."""
+        from chatbot.app import to_english_query_text
+
+        with patch("chatbot.app.is_english", return_value=True):
+            with patch("chatbot.app.translate_to_english") as mock_tr:
+                assert to_english_query_text("What is snowflake?") == "What is snowflake?"
+                mock_tr.assert_not_called()
+
+    def test_to_english_query_text_uses_valid_translation(self):
+        """Traduction Google valide : utilisée."""
+        from chatbot.app import to_english_query_text
+
+        with patch("chatbot.app.is_english", return_value=False):
+            with patch("chatbot.app.translate_to_english", return_value="What is snowflake?"):
+                result = to_english_query_text("qu'est ce que snowflake ?")
+                assert result == "What is snowflake?"
+
+    def test_to_english_query_text_rejects_garbage_translation(self):
+        """Page d'erreur Google (500) renvoyée en « traduction » → texte source."""
+        from chatbot.app import to_english_query_text
+
+        garbage = (
+            "Error 500 (Server Error)!!1500.That's an error.There was an error."
+            "Please try again later.That's all we know."
+        )
+        with patch("chatbot.app.is_english", return_value=False):
+            with patch("chatbot.app.translate_to_english", return_value=garbage):
+                result = to_english_query_text("quelles sont les versions de snowflake ?")
+                assert result == "quelles sont les versions de snowflake ?"
+
 
 class TestGetEmbeddings:
     """Tests pour get_embeddings (st.cache_resource)."""
@@ -210,10 +241,10 @@ class TestChatbotAppConstants:
         assert MIN_VECTOR_SCORE == 0.45
 
     def test_top_k_default(self):
-        """TOP_K = 3."""
+        """TOP_K = 6 (contexte élargi pour les questions conceptuelles)."""
         from chatbot.app import TOP_K
 
-        assert TOP_K == 3
+        assert TOP_K == 6
 
     def test_alpha_value(self):
         """ALPHA = 0.7."""

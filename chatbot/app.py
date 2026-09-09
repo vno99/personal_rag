@@ -13,6 +13,7 @@ from fusion import fuse, is_in_scope
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_openai import ChatOpenAI
 from langdetect import detect
+from rewrite import build_rewrite_messages, is_plausible_translation, parse_search_query
 from weaviate.classes.query import HybridFusion, MetadataQuery
 
 WEAVIATE_HOST = os.getenv("WEAVIATE_HOST", "host.docker.internal")
@@ -30,10 +31,15 @@ NORMALIZE_EMBEDDINGS = True
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 MIN_VECTOR_SCORE = 0.45
-TOP_K = 3
+# Contexte élargi : avec un top-3, le chunk conceptuel d'une question
+# « what is X » (parfois en rang ~4-6 selon le reformulage) sortait de la
+# fenêtre → repli systématique.
+TOP_K = 6
 ALPHA = 0.7
 TEMPERATURE = 0.1
 MAX_TOKEN = 1500
+# Réécriture de requête : réponse courte, pas de "reasoning" (cf. rewrite.py).
+REWRITE_MAX_TOKENS = 90
 LLM_MODEL = os.getenv("OPENROUTER_LLM_MODEL", "minimax/minimax-m2.7:free")
 OPENROUTER_API_BASE = os.getenv("OPENROUTER_API_BASE", "https://openrouter.ai/api/v1")
 
@@ -119,6 +125,54 @@ def translate_to_english(text):
         return text
 
 
+def to_english_query_text(query_text):
+    """Traduit la question en anglais si nécessaire, en validant la sortie.
+
+    Google Translate (deep_translator) renvoie parfois une page d'erreur 500 en
+    guise de « traduction » : si la sortie est invraisemblable, on garde le texte
+    source et le LLM de réécriture traduira lui-même (rewrite.py exige de
+    l'anglais).
+
+    Args:
+        query_text (str): Question brute (n'importe quelle langue).
+
+    Returns:
+        str: Question en anglais (ou texte source si traduction indisponible).
+    """
+    if is_english(query_text):
+        return query_text
+    translated = translate_to_english(query_text)
+    return translated if is_plausible_translation(translated, query_text) else query_text
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def rewrite_search_query(question_en: str) -> str:
+    """Reformule une question en requête de recherche descriptive (LLM).
+
+    Améliore le retrieval des questions courtes/conceptuelles (ex.
+    « what is snowflake ? ») qui, sinon, remontent des pages de référence
+    hors sujet. Repli sur la question originale si la clé OpenRouter est
+    absente/sentinelle ou si l'appel échoue (réseau, modèle indisponible).
+    """
+    if not question_en:
+        return question_en
+    if not OPENROUTER_API_KEY or OPENROUTER_API_KEY == _OPENROUTER_SENTINEL:
+        return question_en
+    try:
+        rewriter = ChatOpenAI(
+            model=LLM_MODEL,
+            api_key=OPENROUTER_API_KEY,
+            base_url=OPENROUTER_API_BASE,
+            temperature=0.0,
+            max_tokens=REWRITE_MAX_TOKENS,
+        )
+        raw = rewriter.invoke(build_rewrite_messages(question_en)).content
+        return parse_search_query(raw, question_en)
+    except Exception:
+        # Réseau / LLM indisponible : on retombe sur la question telle quelle.
+        return question_en
+
+
 def query_one_collection(client, collection_name, query_text_en, query_vector, top_k):
     """Exécute une recherche hybride sur une collection et parse les résultats."""
     collection = client.collections.get(collection_name)
@@ -171,8 +225,12 @@ def retrieve_context(query_text, top_k=TOP_K, collections=None):
     if collections is None:
         collections = COL_NAME_LIST
 
-    query_text_en = translate_to_english(query_text) if not is_english(query_text) else query_text
-    query_vector = embeddings.embed_query(query_text_en)
+    # Traduction validée en anglais puis reformulation en requête de recherche
+    # descriptive (améliore le classement des questions courtes/conceptuelles,
+    # cf. rewrite.py).
+    query_text_en = to_english_query_text(query_text)
+    search_query_en = rewrite_search_query(query_text_en)
+    query_vector = embeddings.embed_query(search_query_en)
     client = connect_client()
 
     # Ignore les collections configurées mais non encore ingérées en base
@@ -187,7 +245,7 @@ def retrieve_context(query_text, top_k=TOP_K, collections=None):
         }
 
     results_by_collection = [
-        query_one_collection(client, name, query_text_en, query_vector, top_k) for name in existing
+        query_one_collection(client, name, search_query_en, query_vector, top_k) for name in existing
     ]
 
     fused = fuse(results_by_collection, top_k=top_k)
@@ -312,26 +370,26 @@ def main():
                                 base_url=OPENROUTER_API_BASE,
                                 temperature=TEMPERATURE,
                                 max_tokens=MAX_TOKEN,
+                                extra_body={"reasoning": {"enabled": True}},
                             )
 
                             rag_prompt = f"""<|role|>EXPERT<|end|>
+                                AVAILABLE CONTEXT:
+                                {_escape_context(context)}
 
-                            AVAILABLE CONTEXT:
-                            {_escape_context(context)}
+                                QUESTION: {_escape_context(prompt)}
 
-                            QUESTION: {_escape_context(prompt)}
+                                <|instructions|>
+                                1. Réponds exclusivement dans la langue demandée : {selected_language}. Ne réponds pas en anglais si la langue demandée est Français.
+                                2. Stick strictly to the provided context. Do not invent information not present.
+                                3. Si l'information n'est pas dans le contexte, réponds uniquement par : "{FALLBACK_MESSAGES[selected_language]}". Do not add any other information.
+                                4. Pour le code SQL/Python : fournis une copie exacte du contexte, sans commentaires supplémentaires.
+                                5. Ne commence pas par des salutations ou "Voici la réponse". Réponds directement au fond.
+                                6. Mentionne brièvement la source du contexte si c'est pertinent.
+                                7. Language: {selected_language} (technical tone).
+                                <|end|>
 
-                            <|instructions|>
-                            1. Provide a concise and complete answer.
-                               Stick strictly to the provided context.
-                               If the information is dense, use bullet points to maintain clarity.
-                            2. If the information is not present in the context, reply only with: "Not in the provided documentation."
-                               Do not add any other information.
-                            3. For SQL/Python code, provide an exact copy from the context.
-                            4. Language: {selected_language} (technical tone).
-                            <|end|>
-
-                            ANSWER:"""
+                                ANSWER:"""
 
                             response = llm.invoke(rag_prompt)
                             full_response = response.content
